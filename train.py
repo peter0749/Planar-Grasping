@@ -64,7 +64,11 @@ def main(args):
             rank=args.rank,
             world_size=args.world_size
         )
+    print('===*** Preprocessing ***===')
+    sys.stdout.flush()
     dataset = CornellGraspDataset(return_box=True)
+    print('Done!')
+    sys.stdout.flush()
     sampler = None
     if args.world_size>1:
         sampler = DistributedSampler(dataset)
@@ -88,6 +92,8 @@ def main(args):
 
     begin_ts = time.time()
     fold_acc = np.zeros(cfg.n_folds)
+    print('===*** Begin Training ***===')
+    sys.stdout.flush()
     for fold_id in range(cfg.n_folds):
         base_model = GraspModel(backbone=args.backbone, with_fc=args.with_fc)
         if args.f16:
