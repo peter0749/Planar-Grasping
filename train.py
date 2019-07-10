@@ -64,7 +64,7 @@ def main(args):
             rank=args.rank,
             world_size=args.world_size
         )
-    print('===*** Preprocessing ***===')
+    print('===***  Preprocessing ***===')
     sys.stdout.flush()
     dataset = CornellGraspDataset(return_box=True)
     print('Done!')
