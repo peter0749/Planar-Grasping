@@ -16,5 +16,5 @@ uniq "./processedData/z.txt" > "./processedData/z_uniq.txt"
 cd ..
 
 echo "Generating numpy objects..."
-sync && python preprocess_id.py
+python preprocess_id.py
 

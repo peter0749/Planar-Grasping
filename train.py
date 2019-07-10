@@ -9,6 +9,8 @@ import numpy as np
 import torch
 torch.backends.cudnn.benchmark = True
 import torch.optim as optim
+from torch.utils.data.distributed import DistributedSampler
+from torch import distributed
 from tensorboardX import SummaryWriter
 from loss import grasp_loss
 from dataset import CornellGraspDataset
@@ -41,16 +43,39 @@ def parse_args():
     parser.add_argument('--no_cuda', action='store_true', help='Use CPU')
     parser.add_argument('--f16', action='store_true', help='Half precision training')
     parser.add_argument('--with_fc', action='store_true', help='With fc layers (like YOLOv1)')
+    parser.add_argument('--backend',type=str,default='gloo',help='Name of the backend to use.')
+    parser.add_argument('-i','--init-method',type=str,default='tcp://127.0.0.1:23456',help='URL specifying how to initialize the package.')
+    parser.add_argument('-r', '--rank', type=int, help='Rank of the current process.', default=0)
+    parser.add_argument('-s','--world-size',type=int,help='Number of processes participating in the job.', default=0)
     args = parser.parse_args()
     args.cuda = not args.no_cuda
     return args
 
 def main(args):
+    if args.world_size>1:
+        distributed.init_process_group(
+            backend=args.backend,
+            init_method=args.init_method,
+            rank=args.rank,
+            world_size=args.world_size
+        )
     dataset = CornellGraspDataset(return_box=True)
+    sampler = None
+    if args.world_size>1:
+        sampler = DistributedSampler(dataset)
     dataloader = torch.utils.data.DataLoader(
                 dataset,
                 batch_size=args.batch_size,
-                shuffle=True,
+                shuffle=(sampler is None),
+                num_workers=args.n_workers,
+                pin_memory=True if args.cuda else False,
+                drop_last=True,
+                sampler=sampler
+                )
+    val_dataloader = torch.utils.data.DataLoader(
+                dataset,
+                batch_size=args.batch_size,
+                shuffle=False,
                 num_workers=args.n_workers,
                 pin_memory=True if args.cuda else False,
                 drop_last=True
@@ -59,19 +84,22 @@ def main(args):
     begin_ts = time.time()
     fold_acc = np.zeros(cfg.n_folds)
     for fold_id in range(cfg.n_folds):
-        model = GraspModel(backbone=args.backbone, with_fc=args.with_fc)
+        base_model = GraspModel(backbone=args.backbone, with_fc=args.with_fc)
         if args.f16:
-            model = model.half()
-            for layer in model.modules():
+            base_model = base_model.half()
+            for layer in base_model.modules():
                 if isinstance(layer, torch.nn.BatchNorm2d):
                     layer.float()
         if args.cuda:
-            model = model.cuda()
+            base_model = base_model.cuda()
+        model = torch.nn.parallel.DistributedDataParallel(base_model) if args.world_size>1 else base_model
         optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
         lr_scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[45,90], gamma=0.2)
-
         dataset.set_current_fold(fold_id)
         for e in range(args.nepoch):
+            if not sampler is None:
+                sampler.set_epoch(e)
+            lr_scheduler.step()
             model.train()
             dataset.set_current_state('train')
             cnt_accum = 0
@@ -107,7 +135,7 @@ def main(args):
             loss_accum = 0
             acc_accum = 0
             with torch.no_grad():
-                for (inp, target, bbox) in dataloader:
+                for (inp, target, bbox) in val_dataloader:
                     if args.f16:
                         inp = inp.half()
                         target = target.half()
@@ -126,7 +154,6 @@ def main(args):
                 avg_val_loss = loss_accum / cnt_accum
                 avg_val_acc = acc_accum / (bbox_accum+1e-8)
 
-            lr_scheduler.step()
             end_ts = time.time()
             elapsed_sec = end_ts-begin_ts
             elapsed = datetime.timedelta(seconds=int(elapsed_sec))
@@ -136,7 +163,7 @@ def main(args):
             fold_acc[fold_id] = avg_val_acc
             print("Fold: [%2d/%2d] Epoch: [%2d/%2d] loss: %.4f val_loss: %.4f acc: %.4f val_acc: %.4f elapsed: %s, eta: %s"%(fold_id+1, cfg.n_folds, e+1, args.nepoch, avg_train_loss, avg_val_loss, avg_train_acc, avg_val_acc, str(elapsed), str(eta)))
             sys.stdout.flush()
-        del model
+        del model, base_model
         gc.collect()
         torch.cuda.empty_cache() # clear memory after every fold
     print("ACC: %.4f, STD: %.4f"%( np.mean(avg_val_acc), np.std(avg_val_acc)  ))
