@@ -55,7 +55,7 @@ def parse_args():
     return args
 
 def main(args):
-    if len(args.save_path)>0 not os.path.exists(args.save_path):
+    if len(args.save_path)>0 and (not os.path.exists(args.save_path)):
         os.makedirs(args.save_path)
     if args.world_size>1:
         distributed.init_process_group(
