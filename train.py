@@ -35,6 +35,9 @@ def parse_args():
         '--momentum', type=float, default=0.9, help='Momentum of SGD'
     )
     parser.add_argument(
+        '--save_path', type=str, default='./weights', help=''
+    )
+    parser.add_argument(
         '--backbone', type=str, default='vgg16', help='Model backbone (vgg16/resnet50)'
     )
     parser.add_argument(
@@ -52,6 +55,8 @@ def parse_args():
     return args
 
 def main(args):
+    if len(args.save_path)>0 not os.path.exists(args.save_path):
+        os.makedirs(args.save_path)
     if args.world_size>1:
         distributed.init_process_group(
             backend=args.backend,
@@ -163,6 +168,8 @@ def main(args):
             fold_acc[fold_id] = avg_val_acc
             print("Fold: [%2d/%2d] Epoch: [%2d/%2d] loss: %.4f val_loss: %.4f acc: %.4f val_acc: %.4f elapsed: %s, eta: %s"%(fold_id+1, cfg.n_folds, e+1, args.nepoch, avg_train_loss, avg_val_loss, avg_train_acc, avg_val_acc, str(elapsed), str(eta)))
             sys.stdout.flush()
+        if len(args.save_path)>0 and args.rank==0:
+            torch.save(base_model.state_dict(), args.save_path+"/w-f%02d-acc-%03d.pth"%(fold_id+1, int(avg_val_acc*100)))
         del model, base_model
         gc.collect()
         torch.cuda.empty_cache() # clear memory after every fold
