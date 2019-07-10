@@ -11,7 +11,7 @@ sometimes = lambda aug: iaa.Sometimes(0.5, aug)
 def get_imgaug():
     seq_spatial = sometimes(iaa.Affine(
                 translate_px={"x": (-50, 50), "y": (-50, 50)}, # translate by -20 to +20 percent (per axis)
-                rotate=(-30, 30), # rotate by -45 to +45 degrees
+                rotate=(-160, 160), # rotate by -160 to +160 degrees
                 order=[0, 1], # use nearest neighbour or bilinear interpolation (fast)
                 cval=(0, 255), # if mode is constant, use a cval between 0 and 255
                 mode=ia.ALL # use any of scikit-image's warping modes (see 2nd image from the top for examples)
