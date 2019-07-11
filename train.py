@@ -95,6 +95,8 @@ def main(args):
     print('===*** Begin Training ***===')
     sys.stdout.flush()
     for fold_id in range(cfg.n_folds):
+        if args.world_size>1:
+            sampler = DistributedSampler(dataset)
         base_model = GraspModel(backbone=args.backbone, with_fc=args.with_fc)
         if args.f16:
             base_model = base_model.half()
