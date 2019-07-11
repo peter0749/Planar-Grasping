@@ -4,21 +4,23 @@ import torch.nn as nn
 from torch.nn import Parameter
 from torch.autograd import Variable
 import torch.nn.functional as F
-from torchvision.models import resnet50, vgg16_bn
+from torchvision.models import resnet50, vgg16_bn, vgg11_bn
 from torchvision.models.mobilenet import mobilenet_v2
 
 class GraspModel(nn.Module):
-    def __init__(self, backbone='vgg16', with_fc=False):
+    def __init__(self, backbone='vgg11', with_fc=False):
         super(GraspModel, self).__init__()
         self.valid_backbones = {
             'resnet50': resnet50,
             'vgg16' : vgg16_bn,
+            'vgg11' : vgg11_bn,
             'mobilenetv2' : mobilenet_v2,
         }
         assert backbone in self.valid_backbones
         self.last_channel_n = {
             'resnet50': 2048,
             'vgg16': 512,
+            'vgg11': 512,
             'mobilenetv2' : 1280,
         }
         self.backbone = self.valid_backbones[backbone](pretrained=True)
@@ -32,6 +34,7 @@ class GraspModel(nn.Module):
         self.feature_forward_methods = {
             'resnet50': self.resnet50_forward,
             'vgg16' : self.vgg16_forward,
+            'vgg11' : self.vgg16_forward,
             'mobilenetv2': self.vgg16_forward
         }
         self.feature_forward = self.feature_forward_methods[backbone]
@@ -91,7 +94,7 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 if __name__=='__main__':
-    for backbone in ['vgg16', 'resnet50', 'mobilenetv2']:
+    for backbone in ['vgg16', 'resnet50', 'mobilenetv2', 'vgg11']:
         for mode in [True, False]:
             grasp_model = GraspModel(backbone=backbone, with_fc=mode)
             print(grasp_model)

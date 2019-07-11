@@ -38,7 +38,7 @@ def parse_args():
         '--save_path', type=str, default='./weights', help=''
     )
     parser.add_argument(
-        '--backbone', type=str, default='vgg16', help='Model backbone (vgg16/mobilenetv2/resnet50)'
+        '--backbone', type=str, default='vgg11', help='Model backbone (vgg11/vgg16/mobilenetv2/resnet50)'
     )
     parser.add_argument(
         '--n_workers', type=int, default=5, help='Multiprocessing'
