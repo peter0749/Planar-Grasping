@@ -21,7 +21,7 @@ max_pad_bbox = 10
 lambda_noobj = 0.5 # Same as YOLOv1
 lambda_coord = 5   # Same as YOLOv1
 lambda_rot = 4
-threshold = 0.7
+threshold = 0.8
 
 crop_range = 30
 crop_size = 320

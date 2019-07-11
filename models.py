@@ -5,6 +5,7 @@ from torch.nn import Parameter
 from torch.autograd import Variable
 import torch.nn.functional as F
 from torchvision.models import resnet50, vgg16_bn
+from torchvision.models.mobilenet import mobilenet_v2
 
 class GraspModel(nn.Module):
     def __init__(self, backbone='vgg16', with_fc=False):
@@ -12,16 +13,18 @@ class GraspModel(nn.Module):
         self.valid_backbones = {
             'resnet50': resnet50,
             'vgg16' : vgg16_bn,
+            'mobilenetv2' : mobilenet_v2,
         }
         assert backbone in self.valid_backbones
         self.last_channel_n = {
             'resnet50': 2048,
             'vgg16': 512,
+            'mobilenetv2' : 1280,
         }
         self.backbone = self.valid_backbones[backbone](pretrained=True)
         if hasattr(self.backbone, 'classifier'):
             del self.backbone.classifier
-        if backbone=='resnet50':
+        if backbone=='resnet50' or backbone=='mobilenetv2':
             if hasattr(self.backbone, 'avgpool'):
                 del self.backbone.avgpool
             if hasattr(self.backbone, 'fc'):
@@ -29,6 +32,7 @@ class GraspModel(nn.Module):
         self.feature_forward_methods = {
             'resnet50': self.resnet50_forward,
             'vgg16' : self.vgg16_forward,
+            'mobilenetv2': self.vgg16_forward
         }
         self.feature_forward = self.feature_forward_methods[backbone]
         self.with_fc = with_fc
@@ -55,7 +59,7 @@ class GraspModel(nn.Module):
         x = x.view(x.size(0), 512, cfg.grid_size, cfg.grid_size) # (b, 512, 7 ,7)
         conf = torch.sigmoid(self.conf_layer(x))
         xy = torch.sigmoid(self.xy_layer(x))
-        wh = self.wh_layer(x)
+        wh = torch.exp(self.wh_layer(x)) # YOLOv2
         tha = self.cossine_layer(x) # 0~2pi
         x = torch.cat((conf, xy, wh, tha), 1) # (b, c, h, w)
         return x
@@ -64,7 +68,7 @@ class GraspModel(nn.Module):
         x = self.feature_forward(x)
         conf = torch.sigmoid(self.conf_layer(x))
         xy = torch.sigmoid(self.xy_layer(x))
-        wh = self.wh_layer(x)
+        wh = torch.exp(self.wh_layer(x)) # YOLOv2
         tha = self.cossine_layer(x) # 0~2pi
         x = torch.cat((conf, xy, wh, tha), 1) # (b, c, h, w)
         return x
@@ -87,7 +91,7 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 if __name__=='__main__':
-    for backbone in ['vgg16', 'resnet50']:
+    for backbone in ['vgg16', 'resnet50', 'mobilenetv2']:
         for mode in [True, False]:
             grasp_model = GraspModel(backbone=backbone, with_fc=mode)
             print(grasp_model)

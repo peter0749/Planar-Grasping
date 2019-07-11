@@ -68,7 +68,9 @@ def center_crop(x, pts=None, crop_size=320):
     return x[up_c:down_c, left_c:right_c]
 def preprocess_input(x):
     x = np.concatenate( [ cv2.resize(x[...,i], (cfg.input_size, cfg.input_size), interpolation=cv2.INTER_AREA)[...,np.newaxis] for i in range(x.shape[-1])  ] , axis=-1)
-    return x.astype(np.float32)-144
+    x = x.astype(np.float32)/255.0-np.array([[[0.485, 0.456, 0.406]]], dtype=np.float32) # [0,255] -> [0,1] -> -mean
+    x = x / np.array([[[0.229, 0.224, 0.225]]], dtype=np.float32) # /std
+    return x
 def aug_data(seq, img, pts=None):
     if pts is None:
         return seq(image=img)
