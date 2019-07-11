@@ -174,8 +174,8 @@ def paramize_bbox(x):
     offset_y = xy[1] - grid_idx_y # decimal
     h  = np.linalg.norm(x[0]-x[1]) # related to grid scale
     w  = np.linalg.norm(x[1]-x[2])
-    costha = (x[1,0]-x[0,0]) / h  # (x[1].x - x[0].x) / norm(x[1]-x[0])
-    sintha = -(x[1,1]-x[0,1]) / h # (x[1].y - x[0].y) / norm(x[1]-x[0]) coord in img is upside down
+    costha = (x[1,0]-x[0,0]) / (h+1e-8)  # (x[1].x - x[0].x) / norm(x[1]-x[0])
+    sintha = -(x[1,1]-x[0,1]) / (h+1e-8) # (x[1].y - x[0].y) / norm(x[1]-x[0]) coord in img is upside down
     costha2 = 2*costha*costha-1  # Double-Angle formula
     sintha2 = 2*costha*sintha
     return grid_idx_x, grid_idx_y, offset_x, offset_y, w, h, costha2, sintha2
