@@ -4,37 +4,61 @@ import torch.nn as nn
 from torch.nn import Parameter
 from torch.autograd import Variable
 import torch.nn.functional as F
-from torchvision.models import resnet50, vgg16_bn, vgg11_bn
+from torchvision.models import resnet50, resnet18, resnet34, resnet101, vgg16_bn, vgg11_bn, vgg19_bn, vgg11, vgg16, vgg19
 from torchvision.models.mobilenet import mobilenet_v2
 
 class GraspModel(nn.Module):
-    def __init__(self, backbone='vgg11', with_fc=False):
+    def __init__(self, backbone='vgg19', with_fc=False):
         super(GraspModel, self).__init__()
         self.valid_backbones = {
             'resnet50': resnet50,
-            'vgg16' : vgg16_bn,
-            'vgg11' : vgg11_bn,
+            'resnet18': resnet18,
+            'resnet34': resnet34,
+            'resnet101': resnet101,
+            'vgg16_bn' : vgg16_bn,
+            'vgg11_bn' : vgg11_bn,
+            'vgg19_bn' : vgg19_bn,
+            'vgg16' : vgg16,
+            'vgg11' : vgg11,
+            'vgg19' : vgg19,
             'mobilenetv2' : mobilenet_v2,
         }
         assert backbone in self.valid_backbones
         self.last_channel_n = {
             'resnet50': 2048,
+            'resnet18': 512,
+            'resnet34': 512,
+            'resnet101': 2048,
             'vgg16': 512,
             'vgg11': 512,
+            'vgg19': 512,
+            'vgg16_bn': 512,
+            'vgg11_bn': 512,
+            'vgg19_bn': 512,
             'mobilenetv2' : 1280,
         }
         self.backbone = self.valid_backbones[backbone](pretrained=True)
         if hasattr(self.backbone, 'classifier'):
             del self.backbone.classifier
-        if backbone=='resnet50' or backbone=='mobilenetv2':
-            if hasattr(self.backbone, 'avgpool'):
-                del self.backbone.avgpool
-            if hasattr(self.backbone, 'fc'):
-                del self.backbone.fc
+        if hasattr(self.backbone, 'avgpool'):
+            del self.backbone.avgpool
+        if hasattr(self.backbone, 'fc'):
+            del self.backbone.fc
+        if hasattr(self.backbone, 'fc1'):
+            del self.backbone.fc1
+        if hasattr(self.backbone, 'fc2'):
+            del self.backbone.fc2
         self.feature_forward_methods = {
             'resnet50': self.resnet50_forward,
+            'resnet18': self.resnet50_forward,
+            'resnet34': self.resnet50_forward,
+            'resnet101': self.resnet50_forward,
             'vgg16' : self.vgg16_forward,
             'vgg11' : self.vgg16_forward,
+            'vgg19' : self.vgg16_forward,
+            'vgg16_bn' : self.vgg16_forward,
+            'vgg11_bn' : self.vgg16_forward,
+            'vgg19_bn' : self.vgg16_forward,
             'mobilenetv2': self.vgg16_forward
         }
         self.feature_forward = self.feature_forward_methods[backbone]
@@ -94,7 +118,7 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 if __name__=='__main__':
-    for backbone in ['vgg16', 'resnet50', 'mobilenetv2', 'vgg11']:
+    for backbone in ['vgg11', 'vgg16', 'vgg19', 'vgg11_bn', 'vgg16_bn', 'vgg19_bn', 'mobilenetv2', 'resnet18', 'resnet34', 'resnet50', 'resnet101']:
         for mode in [True, False]:
             grasp_model = GraspModel(backbone=backbone, with_fc=mode)
             print(grasp_model)
