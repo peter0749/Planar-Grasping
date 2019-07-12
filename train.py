@@ -33,7 +33,7 @@ def parse_args():
         '--weight_decay', type=float, default=0.001, help='Weight decay (l2)'
     )
     parser.add_argument(
-        '--momentum', type=float, default=0.9, help='Momentum of SGD'
+        '--momentum', type=float, default=0.99, help='Momentum of SGD'
     )
     parser.add_argument(
         '--save_path', type=str, default='./weights', help=''
@@ -46,7 +46,7 @@ def parse_args():
         '--backbone', type=str, default='vgg19_bn', help='Model backbone (vgg11/vgg16/vgg19/vgg11_bn/vgg16_bn/vgg19_bn/mobilenetv2/resnet18/resnet34/resnet50/resnet101)'
     )
     parser.add_argument(
-        '--n_workers', type=int, default=5, help='Multiprocessing'
+        '--n_workers', type=int, default=6, help='Multiprocessing'
     )
     parser.add_argument('--no_cuda', action='store_true', help='Use CPU')
     parser.add_argument('--f16', action='store_true', help='Half precision training')
@@ -136,7 +136,7 @@ def main(args):
                 loss.backward()
                 optimizer.step()
                 loss_accum += loss.item() * len(inp)
-                bbox_pred = feature2bboxwdeg(out.detach().cpu().numpy(), cfg.threshold)[0]
+                bbox_pred = feature2bboxwdeg(out.detach().cpu().numpy(), cfg.hinge_margin)[0]
                 bbox = bbox.numpy()
                 for aa, bb in zip(bbox_pred, bbox):
                     acc_accum += bbox_correct(aa,bb)
@@ -166,7 +166,7 @@ def main(args):
                     out = model(inp)
                     loss = grasp_loss(out, target)
                     loss_accum += loss.item() * len(inp)
-                    bbox_pred = feature2bboxwdeg(out.detach().cpu().numpy(), cfg.threshold)[0]
+                    bbox_pred = feature2bboxwdeg(out.detach().cpu().numpy(), cfg.hinge_margin)[0]
                     bbox = bbox.numpy()
                     for aa, bb in zip(bbox_pred, bbox):
                         acc_accum += bbox_correct(aa,bb)

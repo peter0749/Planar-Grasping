@@ -240,6 +240,7 @@ class CornellGraspDataset(Dataset):
             model_input = np.append(model_input, depth[...,np.newaxis], axis=-1)
         model_input = utils.preprocess_input(model_input)
         label = np.zeros((cfg.grid_size,cfg.grid_size,7), dtype=np.float32) # (confidence,x,y,w,h,cos,sin)
+        label[:,:,0] = -1.0 # negative
         for box in boxes:
             # grid_idx_x, grid_idx_y, offset_x, offset_y, w, h, costha2, sintha2
             box = box.clip(1e-6, 1-1e-6)
