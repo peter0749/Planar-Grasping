@@ -21,10 +21,10 @@ from utils import bbox_correct, feature2bboxwdeg
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--batch_size', type=int, default=32, help='input batch size'
+        '--batch_size', type=int, default=64, help='input batch size'
     )
     parser.add_argument(
-        '--nepoch', type=int, default=100, help='number of epochs to train for'
+        '--nepoch', type=int, default=50, help='number of epochs to train for'
     )
     parser.add_argument(
         '--lr', type=float, default=0.0005, help='Learning rate'
@@ -33,7 +33,7 @@ def parse_args():
         '--weight_decay', type=float, default=0.001, help='Weight decay (l2)'
     )
     parser.add_argument(
-        '--momentum', type=float, default=0.99, help='Momentum of SGD'
+        '--momentum', type=float, default=0.9, help='Momentum of SGD'
     )
     parser.add_argument(
         '--save_path', type=str, default='./weights', help=''
