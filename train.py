@@ -10,6 +10,7 @@ import torch
 torch.backends.cudnn.benchmark = True
 import torch.optim as optim
 from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data import SequentialSampler, RandomSampler, BatchSampler
 from torch import distributed
 from tensorboardX import SummaryWriter
 from loss import grasp_loss
@@ -37,9 +38,12 @@ def parse_args():
     parser.add_argument(
         '--save_path', type=str, default='./weights', help=''
     )
+    parser.add_argument(
+        '--split_mode', type=str, default='obj', help='obj/img'
+    )
     # vgg11/vgg16/vgg19/vgg11_bn/vgg16_bn/vgg19_bn/mobilenetv2/resnet18/resnet34/resnet50/resnet101
     parser.add_argument(
-        '--backbone', type=str, default='vgg11_bn', help='Model backbone ([vgg11]/vgg16/vgg19/vgg11_bn/vgg16_bn/vgg19_bn/mobilenetv2/resnet18/resnet34/resnet50/resnet101)'
+        '--backbone', type=str, default='vgg19_bn', help='Model backbone (vgg11/vgg16/vgg19/vgg11_bn/vgg16_bn/vgg19_bn/mobilenetv2/resnet18/resnet34/resnet50/resnet101)'
     )
     parser.add_argument(
         '--n_workers', type=int, default=5, help='Multiprocessing'
@@ -55,6 +59,17 @@ def parse_args():
     args.cuda = not args.no_cuda
     return args
 
+def setup_dataloader(dataset, sampler, args, mode='train'):
+    dataloader = torch.utils.data.DataLoader(
+                dataset,
+                batch_size=args.batch_size,
+                num_workers=args.n_workers,
+                pin_memory=True if args.cuda else False,
+                drop_last=(mode=='train'),
+                sampler=sampler
+                )
+    return dataloader
+
 def main(args):
     if len(args.save_path)>0 and (not os.path.exists(args.save_path)):
         os.makedirs(args.save_path)
@@ -67,37 +82,15 @@ def main(args):
         )
     print('===***  Preprocessing ***===')
     sys.stdout.flush()
-    dataset = CornellGraspDataset(return_box=True)
+    dataset = CornellGraspDataset(split_mode=args.split_mode, return_box=True)
     print('Done!')
     sys.stdout.flush()
-    sampler = None
-    if args.world_size>1:
-        sampler = DistributedSampler(dataset)
-    dataloader = torch.utils.data.DataLoader(
-                dataset,
-                batch_size=args.batch_size,
-                shuffle=(sampler is None),
-                num_workers=args.n_workers,
-                pin_memory=True if args.cuda else False,
-                drop_last=True,
-                sampler=sampler
-                )
-    val_dataloader = torch.utils.data.DataLoader(
-                dataset,
-                batch_size=args.batch_size,
-                shuffle=False,
-                num_workers=args.n_workers,
-                pin_memory=True if args.cuda else False,
-                drop_last=True
-                )
 
     begin_ts = time.time()
     fold_acc = np.zeros(cfg.n_folds)
     print('===*** Begin Training ***===')
     sys.stdout.flush()
     for fold_id in range(cfg.n_folds):
-        if args.world_size>1:
-            sampler = DistributedSampler(dataset)
         base_model = GraspModel(backbone=args.backbone, with_fc=args.with_fc)
         if args.f16:
             base_model = base_model.half()
@@ -108,14 +101,24 @@ def main(args):
             base_model = base_model.cuda()
         model = torch.nn.parallel.DistributedDataParallel(base_model) if args.world_size>1 else base_model
         optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-        lr_scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[45,90], gamma=0.2)
+        lr_scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5,20,90], gamma=0.2)
+
+        ### Setup current fold ###
         dataset.set_current_fold(fold_id)
+
+        best_val_acc = -np.inf
+        best_loss = np.inf
         for e in range(args.nepoch):
-            if not sampler is None:
-                sampler.set_epoch(e)
+            dataset.set_current_state('train')
+            train_sampler = DistributedSampler(dataset) if args.world_size>1 else RandomSampler(dataset)
+            if args.world_size>1:
+                train_sampler.set_epoch(e)
+            dataloader = setup_dataloader(dataset, train_sampler, args, mode='train')
+            #assert sampler_ref is train_sampler
+            if args.world_size>1:
+                train_sampler.set_epoch(e)
             lr_scheduler.step()
             model.train()
-            dataset.set_current_state('train')
             cnt_accum = 0
             bbox_accum = 0
             loss_accum = 0
@@ -141,9 +144,13 @@ def main(args):
                 cnt_accum += len(inp)
             avg_train_loss = loss_accum / cnt_accum
             avg_train_acc = acc_accum / (bbox_accum+1e-8)
+            del dataloader, train_sampler
 
-            model.eval()
             dataset.set_current_state('test')
+            val_sampler = SequentialSampler(dataset)
+            val_dataloader = setup_dataloader(dataset, val_sampler, args, mode='test')
+            #assert sampler_ref is val_sampler
+            model.eval()
             cnt_accum = 0
             bbox_accum = 0
             loss_accum = 0
@@ -167,22 +174,32 @@ def main(args):
                     cnt_accum += len(inp)
                 avg_val_loss = loss_accum / cnt_accum
                 avg_val_acc = acc_accum / (bbox_accum+1e-8)
+            del val_dataloader, val_sampler
 
+            if avg_val_acc>best_val_acc or (abs(avg_val_acc-best_val_acc)<1e-5 and avg_val_loss<best_loss): # improvement
+                if len(args.save_path)>0 and args.rank==0: # save checkpoint
+                    best_model_write_pth = args.save_path+"/w-f%02d.pth"%(fold_id+1)
+                    sys.stderr.write("Accuracy improved from %.4f to %.4f. Saving model to %s...\n"%(best_val_acc, avg_val_acc, best_model_write_pth))
+                    state_dict = base_model.state_dict()
+                    state_dict['val_accuracy'] = avg_val_acc
+                    torch.save(state_dict, best_model_write_pth)
+            best_val_acc = max(best_val_acc, avg_val_acc)
+            best_loss = min(best_loss, avg_val_loss)
             end_ts = time.time()
             elapsed_sec = end_ts-begin_ts
             elapsed = datetime.timedelta(seconds=int(elapsed_sec))
             nepochs_passed = args.nepoch*fold_id+e+1
             nepochs_remain = args.nepoch*cfg.n_folds - nepochs_passed
             eta = datetime.timedelta(seconds=int(elapsed_sec/nepochs_passed*nepochs_remain))
-            fold_acc[fold_id] = avg_val_acc
-            print("Fold: [%2d/%2d] Epoch: [%2d/%2d] loss: %.4f val_loss: %.4f acc: %.4f val_acc: %.4f elapsed: %s, eta: %s"%(fold_id+1, cfg.n_folds, e+1, args.nepoch, avg_train_loss, avg_val_loss, avg_train_acc, avg_val_acc, str(elapsed), str(eta)))
+            print("F: [%2d/%2d] E: [%2d/%2d] l: %.4f vl: %.4f a: %.4f va: %.4f(%.4f) ela: %s eta: %s"%(fold_id+1, cfg.n_folds, e+1, args.nepoch, avg_train_loss, avg_val_loss, avg_train_acc, avg_val_acc, best_val_acc, str(elapsed), str(eta)))
             sys.stdout.flush()
-        if len(args.save_path)>0 and args.rank==0:
-            torch.save(base_model.state_dict(), args.save_path+"/w-f%02d-acc-%03d.pth"%(fold_id+1, int(avg_val_acc*100)))
         del model, base_model
         gc.collect()
         torch.cuda.empty_cache() # clear memory after every fold
-    print("ACC: %.4f, STD: %.4f"%( np.mean(avg_val_acc), np.std(avg_val_acc)  ))
+        fold_acc[fold_id] = best_val_acc
+        print("Fold: [%2d/%2d] ACC: %.4f"%(fold_id+1, cfg.n_folds, best_val_acc))
+        sys.stdout.flush()
+    print("ACC: %.4f, STD: %.4f"%( np.mean(fold_acc), np.std(fold_acc)  ))
     sys.stdout.flush()
 
 if __name__=='__main__':

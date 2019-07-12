@@ -58,7 +58,7 @@ def split_cornell_grasp_ids_nfold_by_img(ids):
 
 def split_cornell_grasp_ids_nfold_by_obj(ids, obj2id):
     ids_set = set(ids)
-    obj_list = list(obj2id)
+    obj_list = list(obj2id) # unique
     random.shuffle(obj_list)
     obj_set  = set(obj_list)
     folds = []
@@ -68,9 +68,7 @@ def split_cornell_grasp_ids_nfold_by_obj(ids, obj2id):
         test = []
         for x in obj_list[b:b+step]:
             test += list(set(obj2id[x])&ids_set)
-        train = []
-        for x in list( obj_set - set(test)  ):
-            train += list(set(obj2id[x])&ids_set)
+        train = list( ids_set - set(test)  )
         folds.append((train, test))
     return folds
 
@@ -267,12 +265,11 @@ class CornellGraspDataset(Dataset):
         return len(self.current_state_fold_id)
 
 if __name__=='__main__':
-    '''
     ids = get_cornell_grasp_ids()
     meta, class2id, obj2id = get_cornell_id_meta()
     # Test id -> data
     for id_ in np.random.choice(ids, 3):
-        img_p, pcl_p, pos_p, neg_p = cornell_grasp_id2realpath(id_)
+        img_p, pcl_p, pos_p, neg_p = cornell_grasp_id2realpath(id_)[:4]
         img = parse_img(img_p)
         pts, idx = parse_pcl(pcl_p)
         depth = pc2depth(pts, idx, size=img.shape[:2])
@@ -283,32 +280,29 @@ if __name__=='__main__':
     # Test kfold (image wise)
     folds = split_cornell_grasp_ids_nfold_by_img(ids)
     for (train,test) in folds:
-        print(len(train), len(test))
+        print(len(train), len(test), len(train)+len(test))
         if False:
             for t in [train,test]:
                 for id_ in t:
-                    img_p, pcl_p, pos_p, neg_p = cornell_grasp_id2realpath(id_)
+                    img_p, pcl_p, pos_p, neg_p = cornell_grasp_id2realpath(id_)[:4]
                     print(parse_pcl(pcl_p).shape)
     # Test kfold (obj wise)
     folds = split_cornell_grasp_ids_nfold_by_obj(ids, obj2id)
     for (train,test) in folds:
-        print(len(train), len(test))
+        print(len(train), len(test), len(train)+len(test))
         if False:
             for t in [train,test]:
                 for id_ in t:
-                    img_p, pcl_p, pos_p, neg_p = cornell_grasp_id2realpath(id_)
+                    img_p, pcl_p, pos_p, neg_p = cornell_grasp_id2realpath(id_)[:4]
                     print(parse_pcl(pcl_p).shape)
-    '''
     # Test Dataset
     dataset = CornellGraspDataset(return_box=True)
     for i in range(3):
         dataset[i]
         print(i+1, 3)
-    '''
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=4)
     i = 0
     for (a,b,c) in dataloader:
         i+=1
         if i==3:
             break
-    '''

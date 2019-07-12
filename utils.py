@@ -4,14 +4,14 @@ import numpy as np
 import imgaug as ia
 import imgaug.augmenters as iaa
 from imgaug.augmentables.kps import Keypoint, KeypointsOnImage
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, MultiPoint
 
 sometimes = lambda aug: iaa.Sometimes(0.5, aug)
 
 def get_imgaug():
     seq_spatial = sometimes(iaa.Affine(
                 translate_px={"x": (-60, 60), "y": (-60, 60)}, # translate by -20 to +20 percent (per axis)
-                rotate=(-175, 175), # rotate by -160 to +160 degrees
+                rotate=(-170, 170), # rotate by -160 to +160 degrees
                 order=[0, 1], # use nearest neighbour or bilinear interpolation (fast)
                 cval=(0, 255), # if mode is constant, use a cval between 0 and 255
                 mode=ia.ALL # use any of scikit-image's warping modes (see 2nd image from the top for examples)
@@ -110,29 +110,61 @@ def feature2bboxwdeg(p, th):
 def bbox_correct(preds, gt):
     correct = 0
     for p in preds:
-        p_poly = Polygon( [ [x[0],x[1]] for x in p ]  )
+        try:
+            p_poly = Polygon(p).convex_hull
+        except ValueError:
+            continue
         v_p = p[1]-p[0]
         for bbox in gt:
-            g_poly = Polygon( [ [x[0],x[1]] for x in bbox ]  )
+            if not bbox.any(): # all zeros (padding elements)
+                continue
+            try:
+                g_poly = Polygon(bbox).convex_hull
+            except ValueError:
+                continue
             g_p = bbox[1]-bbox[0]
             deg_diff = np.abs(np.degrees(np.arccos((v_p*g_p).sum() / (np.linalg.norm(v_p)*np.linalg.norm(g_p)+1e-8))))
             deg_diff_m180 = np.abs(deg_diff-180) # robotic arms are symmeric
-            try:
+            iou = 0
+            if p_poly.intersects(g_poly):
+                #try:
                 inter = p_poly.intersection(g_poly).area
-                union = p_poly.area+g_poly.area-inter
+                union = p_poly.area + g_poly.area - inter
                 iou = inter/(union+1e-8)
-            except:
-                continue
-            if ( deg_diff<30 or deg_diff_m180<30 ) and iou>0.25:
+                #except:
+                #    iou = 0
+            if min(deg_diff, deg_diff_m180)<30 and iou>0.25:
                 correct += 1
                 break
     return correct
 
 if __name__=='__main__':
+    from tqdm import tqdm
     get_R = lambda a: np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]])
     bbox = np.array([[-1, -1], [1, -1], [1, 1], [-1, 1]])
-    a = (get_R(np.radians(30+180))@bbox.T).T[np.newaxis]
-    b = (get_R(np.radians(30))@bbox.T).T[np.newaxis]
-    print(a)
-    print(b)
-    print(bbox_correct(a,b))
+    print("Rotation test...")
+    for d in tqdm(np.arange(0, 360, 0.5)):
+        p = (get_R(np.radians(d))@bbox.T).T[np.newaxis]
+        bbox_correct(p, bbox[np.newaxis])
+    print("Done.")
+    print("Random bbox + rotation test...")
+    for _ in tqdm(range(10000)):
+        bbox = np.random.randn(4,2)
+        for d in range(0, 360, 5):
+            p = (get_R(np.radians(d))@bbox.T).T[np.newaxis]
+            bbox_correct(p, bbox[np.newaxis])
+    print("Done.")
+    print("Random bbox test...")
+    for _ in tqdm(range(10000)):
+        a = np.random.randn(4,4,2)
+        b = np.random.randn(4,4,2)
+        bbox_correct(a, b)
+    print("Done.")
+    print("Null bbox test...")
+    for _ in tqdm(range(10000)):
+        a = np.zeros((4,4,2))
+        b = np.random.randn(4,4,2)
+        bbox_correct(a, b)
+        bbox_correct(b, a)
+    print("Done.")
+

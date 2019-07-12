@@ -1,4 +1,5 @@
 import config as cfg
+import numpy as np
 import torch
 
 def grasp_loss(inputs, target):
@@ -34,6 +35,7 @@ def grasp_loss(inputs, target):
 
     loss = lambda_coord*coord_loss + lambda_rot*rot_loss + conf_loss # shape: (b,)
     loss[loss!=loss] = 0
+    loss[loss==np.inf] = 0
     return loss.mean()
 
 if __name__=='__main__':

@@ -16,14 +16,14 @@ cornell_dataset_root = os.path.abspath(cornell_dataset_root)
 cornell_dataset_meta_root = os.path.abspath(cornell_dataset_meta_root)
 
 n_folds = 5
-max_sample_bbox = 5
+max_sample_bbox = 7
 max_pad_bbox = 10
 lambda_noobj = 0.5 # Same as YOLOv1
 lambda_coord = 5   # Same as YOLOv1
 lambda_rot = 7
-threshold = 0.8
+threshold = 0.7
 
-crop_range = 50
+crop_range = 30
 crop_size = 320
 input_size = 224
 grid_scale = 32 # 2^5
