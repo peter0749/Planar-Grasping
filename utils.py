@@ -112,6 +112,8 @@ def bbox_correct(preds, gt):
     for p in preds:
         try:
             p_poly = Polygon(p).convex_hull
+            if not p_poly.is_valid:
+                continue
         except ValueError:
             continue
         v_p = p[1]-p[0]
@@ -120,6 +122,8 @@ def bbox_correct(preds, gt):
                 continue
             try:
                 g_poly = Polygon(bbox).convex_hull
+                if not g_poly.is_valid:
+                    continue
             except ValueError:
                 continue
             g_p = bbox[1]-bbox[0]
@@ -127,12 +131,12 @@ def bbox_correct(preds, gt):
             deg_diff_m180 = np.abs(deg_diff-180) # robotic arms are symmeric
             iou = 0
             if p_poly.intersects(g_poly):
-                #try:
-                inter = p_poly.intersection(g_poly).area
-                union = p_poly.area + g_poly.area - inter
-                iou = inter/(union+1e-8)
-                #except:
-                #    iou = 0
+                try:
+                    inter = p_poly.intersection(g_poly).area
+                    union = p_poly.area + g_poly.area - inter
+                    iou = inter/(union+1e-8)
+                except:
+                    iou = 0
             if min(deg_diff, deg_diff_m180)<30 and iou>0.25:
                 correct += 1
                 break
@@ -150,7 +154,7 @@ if __name__=='__main__':
     print("Random bbox + rotation test...")
     for _ in tqdm(range(10000)):
         bbox = np.random.randn(4,2)
-        for d in range(0, 360, 5):
+        for d in [30, 60]:
             p = (get_R(np.radians(d))@bbox.T).T[np.newaxis]
             bbox_correct(p, bbox[np.newaxis])
     print("Done.")
