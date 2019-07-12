@@ -194,9 +194,12 @@ class CornellGraspDataset(Dataset):
         self.input_mode = input_mode
         self.aug_spatial, self.aug_color = utils.get_imgaug()
         self.return_box = return_box
-
+    def init_current_fold(self):
+        self.train_id, self.test_id = self.folds[self.current_fold]
+        self.current_state_fold_id = self.train_id if self.current_state=='train' else self.test_id
     def set_current_state(self, mode):
         self.current_state = 'train' if mode=='train' else 'test'
+        self.init_current_fold()
     def get_fold_number(self):
         return len(self.folds)
     def set_current_fold(self, f):
@@ -204,9 +207,6 @@ class CornellGraspDataset(Dataset):
         self.init_current_fold()
     def get_current_fold(self):
         return self.current_fold
-    def init_current_fold(self):
-        self.train_id, self.test_id = self.folds[self.current_fold]
-        self.current_state_fold_id = self.train_id if self.current_state=='train' else self.test_id
     def __getitem__(self, index):
         #return torch.zeros((3,224,224)), torch.zeros((7,7,7)), torch.zeros((10,4,2))
         img_p, _, __, ___ , pcl_p, pos_p, neg_p = cornell_grasp_id2realpath(self.current_state_fold_id[index])
@@ -296,10 +296,19 @@ if __name__=='__main__':
                     img_p, pcl_p, pos_p, neg_p = cornell_grasp_id2realpath(id_)[:4]
                     print(parse_pcl(pcl_p).shape)
     # Test Dataset
-    dataset = CornellGraspDataset(return_box=True)
-    for i in range(3):
-        dataset[i]
-        print(i+1, 3)
+    for split_mode in ['img', 'obj']:
+        dataset = CornellGraspDataset(split_mode=split_mode, return_box=True)
+        for fold in range(cfg.n_folds):
+            dataset.set_current_fold(fold)
+            dataset.set_current_state('train')
+            train_len = len(dataset)
+            for i in range(3):
+                dataset[i]
+            dataset.set_current_state('test')
+            val_len = len(dataset)
+            for i in range(3):
+                dataset[i]
+            print(train_len, val_len, train_len+val_len)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=4)
     i = 0
     for (a,b,c) in dataloader:
