@@ -140,7 +140,7 @@ def bbox_correct(preds, gt):
                     iou = inter/(union+1e-8)
                 except:
                     iou = 0
-            if min(deg_diff, deg_diff_m180)<30 and iou>0.25:
+            if min(deg_diff, deg_diff_m180)<cfg.deg_threshold and iou>cfg.iou_threshold:
                 correct += 1
                 break
     return correct
