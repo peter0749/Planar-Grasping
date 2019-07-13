@@ -70,9 +70,11 @@ def feature2bboxwdeg(p, th):
     batch_size = c.shape[0]
     bboxes = []
     degs = []
+    confs = []
     for b in range(batch_size):
         pos = c[b]>th # (h,w)
         argpos = np.argwhere(pos)
+        cc = np.asarray([ c[b, idx[0], idx[1]] for idx in argpos ])
         xx = np.asarray([ idx[1]+x[b, idx[0], idx[1]] for idx in argpos ])
         yy = np.asarray([ idx[0]+y[b, idx[0], idx[1]] for idx in argpos ])
         ww = np.asarray([ w[b, idx[0], idx[1]] for idx in argpos ])
@@ -105,7 +107,8 @@ def feature2bboxwdeg(p, th):
             bs /= cfg.grid_size
         bboxes += [bs]
         degs += [aa]
-    return bboxes, degs
+        confs += [cc]
+    return bboxes, degs, confs
 
 def bbox_correct(preds, gt):
     correct = 0

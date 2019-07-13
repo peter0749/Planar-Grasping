@@ -30,7 +30,7 @@ def parse_args():
         '--lr', type=float, default=0.0005, help='Learning rate'
     )
     parser.add_argument(
-        '--weight_decay', type=float, default=0.001, help='Weight decay (l2)'
+        '--weight_decay', type=float, default=0.01, help='Weight decay (l2)'
     )
     parser.add_argument(
         '--momentum', type=float, default=0.9, help='Momentum of SGD'
