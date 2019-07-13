@@ -21,6 +21,8 @@ max_pad_bbox = 10
 lambda_coord = 5   # Same as YOLOv1
 lambda_rot = 7
 hinge_margin = 1
+iou_threshold = 0.5 # 0.25 in paper
+deg_threshold = 15  # 30   in paper
 
 crop_range = 40
 crop_size = 320
