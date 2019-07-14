@@ -24,13 +24,13 @@ def grasp_loss(inputs, target):
     gt_wh   = target[...,3:5]
     gt_cos_sin = target[...,5:7]
 
-    xy_loss = ((gt_xy-input_xy)*gt_mask).pow(2).sum(-1).sum(-1).sum(-1) # shape: (b,)
-    wh_loss = ((gt_wh-input_wh)*gt_mask).pow(2).sum(-1).sum(-1).sum(-1) # shape: (b,)
+    xy_loss = torch.abs((gt_xy-input_xy)*gt_mask).sum(-1).sum(-1).sum(-1) # shape: (b,)
+    wh_loss = torch.abs((gt_wh-input_wh)*gt_mask).sum(-1).sum(-1).sum(-1) # shape: (b,)
     coord_loss = xy_loss+wh_loss # shape: (b,)
 
-    rot_loss = ((gt_cos_sin-input_cos_sin)*gt_mask).pow(2).sum(-1).sum(-1).sum(-1) # shape: (b,)
+    rot_loss = torch.abs((gt_cos_sin-input_cos_sin)*gt_mask).sum(-1).sum(-1).sum(-1) # shape: (b,)
 
-    conf_loss = (m-input_heatmap*gt_heatmap).clamp(min=0).pow(2) # squared hinge loss: max{0, 1-y_gt*y_hat}**2
+    conf_loss = (m-input_heatmap*gt_heatmap).clamp(min=0) # hinge loss: max{0, 1-y_gt*y_hat}**2
     conf_loss = conf_loss.sum(-1).sum(-1).sum(-1) # shape: (b,)
 
     loss = lambda_coord*coord_loss + lambda_rot*rot_loss + conf_loss # shape: (b,)

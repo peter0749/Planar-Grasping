@@ -87,7 +87,7 @@ class GraspModel(nn.Module):
         conf = self.conf_layer(x)
         xy = torch.sigmoid(self.xy_layer(x))
         wh = torch.exp(self.wh_layer(x)) # YOLOv2
-        tha = self.cossine_layer(x) # 0~2pi
+        tha = self.cossine_layer(x)
         x = torch.cat((conf, xy, wh, tha), 1) # (b, c, h, w)
         return x
 
@@ -96,7 +96,7 @@ class GraspModel(nn.Module):
         conf = self.conf_layer(x)
         xy = torch.sigmoid(self.xy_layer(x))
         wh = torch.exp(self.wh_layer(x)) # YOLOv2
-        tha = self.cossine_layer(x) # 0~2pi
+        tha = self.cossine_layer(x)
         x = torch.cat((conf, xy, wh, tha), 1) # (b, c, h, w)
         return x
 
@@ -122,7 +122,7 @@ if __name__=='__main__':
         for mode in [True, False]:
             grasp_model = GraspModel(backbone=backbone, with_fc=mode)
             print(grasp_model)
-            y = grasp_model(torch.randn((6,3,224,224)))
+            y = grasp_model(torch.randn((6,3,cfg.input_size,cfg.input_size)))
             z = y.mean()
             z.backward()
             print(y.size(), count_parameters(grasp_model))

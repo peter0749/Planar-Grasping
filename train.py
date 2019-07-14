@@ -21,10 +21,10 @@ from utils import bbox_correct, feature2bboxwdeg
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--batch_size', type=int, default=64, help='input batch size'
+        '--batch_size', type=int, default=32, help='input batch size'
     )
     parser.add_argument(
-        '--nepoch', type=int, default=50, help='number of epochs to train for'
+        '--nepoch', type=int, default=45, help='number of epochs to train for'
     )
     parser.add_argument(
         '--lr', type=float, default=0.0005, help='Learning rate'
@@ -88,6 +88,7 @@ def main(args):
 
     begin_ts = time.time()
     fold_acc = np.zeros(cfg.n_folds)
+    fold_acc_easy = np.zeros(cfg.n_folds)
     print('===*** Begin Training ***===')
     sys.stdout.flush()
     for fold_id in range(cfg.n_folds):
@@ -101,7 +102,7 @@ def main(args):
             base_model = base_model.cuda()
         model = torch.nn.parallel.DistributedDataParallel(base_model) if args.world_size>1 else base_model
         optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-        lr_scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5,20,90], gamma=0.2)
+        lr_scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20,40], gamma=0.5)
 
         ### Setup current fold ###
         dataset.set_current_fold(fold_id)
@@ -123,6 +124,8 @@ def main(args):
             bbox_accum = 0
             loss_accum = 0
             acc_accum = 0
+            easy_bbox_accum = 0
+            easy_acc_accum = 0
             for (inp, target, bbox) in dataloader:
                 if args.f16:
                     inp = inp.half()
@@ -136,14 +139,19 @@ def main(args):
                 loss.backward()
                 optimizer.step()
                 loss_accum += loss.item() * len(inp)
-                bbox_pred = feature2bboxwdeg(out.detach().cpu().numpy(), cfg.hinge_margin)[0]
+                bbox_pred, _, bbox_conf = feature2bboxwdeg(out.detach().cpu().numpy(), 0)
                 bbox = bbox.numpy()
-                for aa, bb in zip(bbox_pred, bbox):
-                    acc_accum += bbox_correct(aa,bb)
-                    bbox_accum += len(aa)
+                for aa, bb, cc in zip(bbox_pred, bbox, bbox_conf):
+                    hard_idx = np.where(cc>cfg.grasp_threshold)[0]
+                    easy_idx = np.where(cc>1)[0]
+                    acc_accum += bbox_correct(aa[hard_idx],bb,iou_t=cfg.iou_threshold,deg_t=cfg.deg_threshold)
+                    bbox_accum += len(hard_idx)
+                    easy_acc_accum += bbox_correct(aa[easy_idx],bb,iou_t=cfg.iou_threshold_easy,deg_t=cfg.deg_threshold_easy)
+                    easy_bbox_accum += len(easy_idx)
                 cnt_accum += len(inp)
             avg_train_loss = loss_accum / cnt_accum
             avg_train_acc = acc_accum / (bbox_accum+1e-8)
+            avg_train_easy_acc = easy_acc_accum / (easy_bbox_accum+1e-8)
             del dataloader, train_sampler
 
             dataset.set_current_state('test')
@@ -155,6 +163,8 @@ def main(args):
             bbox_accum = 0
             loss_accum = 0
             acc_accum = 0
+            easy_bbox_accum = 0
+            easy_acc_accum = 0
             with torch.no_grad():
                 for (inp, target, bbox) in val_dataloader:
                     if args.f16:
@@ -166,14 +176,19 @@ def main(args):
                     out = model(inp)
                     loss = grasp_loss(out, target)
                     loss_accum += loss.item() * len(inp)
-                    bbox_pred = feature2bboxwdeg(out.detach().cpu().numpy(), cfg.hinge_margin)[0]
+                    bbox_pred, _, bbox_conf = feature2bboxwdeg(out.detach().cpu().numpy(), 0)
                     bbox = bbox.numpy()
-                    for aa, bb in zip(bbox_pred, bbox):
-                        acc_accum += bbox_correct(aa,bb)
-                        bbox_accum += len(aa)
+                    for aa, bb, cc in zip(bbox_pred, bbox, bbox_conf):
+                        hard_idx = np.where(cc>cfg.grasp_threshold)[0]
+                        easy_idx = np.where(cc>1)[0]
+                        acc_accum += bbox_correct(aa[hard_idx],bb,iou_t=cfg.iou_threshold,deg_t=cfg.deg_threshold)
+                        bbox_accum += len(hard_idx)
+                        easy_acc_accum += bbox_correct(aa[easy_idx],bb,iou_t=cfg.iou_threshold_easy,deg_t=cfg.deg_threshold_easy)
+                        easy_bbox_accum += len(easy_idx)
                     cnt_accum += len(inp)
                 avg_val_loss = loss_accum / cnt_accum
                 avg_val_acc = acc_accum / (bbox_accum+1e-8)
+                avg_val_easy_acc = easy_acc_accum / (easy_bbox_accum+1e-8)
             del val_dataloader, val_sampler
 
             if avg_val_acc>best_val_acc or (abs(avg_val_acc-best_val_acc)<1e-5 and avg_val_loss<best_loss): # improvement
@@ -185,21 +200,23 @@ def main(args):
                     torch.save(state_dict, best_model_write_pth)
             best_val_acc = max(best_val_acc, avg_val_acc)
             best_loss = min(best_loss, avg_val_loss)
+            fold_acc_easy[fold_id] = max(fold_acc_easy[fold_id], avg_val_easy_acc)
             end_ts = time.time()
             elapsed_sec = end_ts-begin_ts
             elapsed = datetime.timedelta(seconds=int(elapsed_sec))
             nepochs_passed = args.nepoch*fold_id+e+1
             nepochs_remain = args.nepoch*cfg.n_folds - nepochs_passed
             eta = datetime.timedelta(seconds=int(elapsed_sec/nepochs_passed*nepochs_remain))
-            print("F: [%2d/%2d] E: [%2d/%2d] l: %.4f vl: %.4f a: %.4f va: %.4f(%.4f) ela: %s eta: %s"%(fold_id+1, cfg.n_folds, e+1, args.nepoch, avg_train_loss, avg_val_loss, avg_train_acc, avg_val_acc, best_val_acc, str(elapsed), str(eta)))
+            print("F: [%2d/%2d] E: [%2d/%2d] l: %.4f vl: %.4f a: %.4f va: %.4f(%.4f) ea: %.4f eva: %.4f ela: %s eta: %s"%(fold_id+1, cfg.n_folds, e+1, args.nepoch, avg_train_loss, avg_val_loss, avg_train_acc, avg_val_acc, best_val_acc, avg_train_easy_acc, avg_val_easy_acc, str(elapsed), str(eta)))
             sys.stdout.flush()
         del model, base_model
         gc.collect()
         torch.cuda.empty_cache() # clear memory after every fold
         fold_acc[fold_id] = best_val_acc
-        print("Fold: [%2d/%2d] ACC: %.4f"%(fold_id+1, cfg.n_folds, best_val_acc))
+        print("Fold: [%2d/%2d] ACC: %.4f EASY_ACC: %.4f"%(fold_id+1, cfg.n_folds, best_val_acc, fold_acc_easy[fold_id]))
         sys.stdout.flush()
     print("ACC: %.4f, STD: %.4f"%( np.mean(fold_acc), np.std(fold_acc)  ))
+    print("EASY_ACC: %.4f, STD: %.4f"%( np.mean(fold_acc_easy), np.std(fold_acc_easy)  ))
     sys.stdout.flush()
 
 if __name__=='__main__':

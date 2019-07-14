@@ -21,15 +21,15 @@ max_pad_bbox = 10 # unknown in paper
 lambda_coord = 5   # Same as YOLOv1
 lambda_rot = 7
 hinge_margin = 1
-iou_threshold = 0.4 # 0.25 in paper
-deg_threshold = 15   # 30   in paper
-grasp_threshold = 0.3 # Unknown in paper
+iou_threshold = 0.25 # 0.25 in paper
+deg_threshold = 30   # 30   in paper
+grasp_threshold = 0.7 # Unknown in paper
 iou_threshold_easy = 0.25
 deg_threshold_easy = 30
 
-crop_range = 50
-crop_size = 352 # 320 in paper
-input_size = 352 # 224 in paper
+crop_range = 40
+crop_size = 320 # 320 in paper
+input_size = 224 # 224 in paper
 grid_scale = 32 # 2^5
 assert input_size%grid_scale==0
 grid_size = input_size//grid_scale # (7?)

@@ -212,7 +212,7 @@ class CornellGraspDataset(Dataset):
         img_p, _, __, ___ , pcl_p, pos_p, neg_p = cornell_grasp_id2realpath(self.current_state_fold_id[index])
         img = parse_img(img_p)
         pts, pts_idx = fetch_pcl(pcl_p)
-        depth = normalize_depth(pc2depth(pts, pts_idx, size=img.shape[:2]))
+        depth = pc2depth(pts, pts_idx, size=img.shape[:2])
         boxes = np.load(pos_p)
         # negative samples not used
         if self.current_state=='train' and len(boxes)>cfg.max_sample_bbox:
@@ -223,6 +223,7 @@ class CornellGraspDataset(Dataset):
             crop_size += random.randint(-cfg.crop_range, cfg.crop_range)
         img, boxes = utils.center_crop(img, boxes, crop_size=crop_size)
         depth = utils.center_crop(depth, crop_size=crop_size)
+        depth = normalize_depth(depth)
 
         if self.current_state=='train':
             seq_spatial = self.aug_spatial.to_deterministic()

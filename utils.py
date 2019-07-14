@@ -11,7 +11,7 @@ sometimes = lambda aug: iaa.Sometimes(0.5, aug)
 def get_imgaug():
     seq_spatial = sometimes(iaa.Affine(
                 translate_px={"x": (-60, 60), "y": (-60, 60)}, # translate by -20 to +20 percent (per axis)
-                rotate=(-170, 170), # rotate by -160 to +160 degrees
+                rotate=(-170, 170), # rotate by -170 to +170 degrees
                 order=[0, 1], # use nearest neighbour or bilinear interpolation (fast)
                 cval=(0, 255), # if mode is constant, use a cval between 0 and 255
                 mode=ia.ALL # use any of scikit-image's warping modes (see 2nd image from the top for examples)
@@ -50,7 +50,8 @@ def center_crop(x, pts=None, crop_size=320):
         return x[up_c:down_c, left_c:right_c], pts
     return x[up_c:down_c, left_c:right_c]
 def preprocess_input(x):
-    x = np.concatenate( [ cv2.resize(x[...,i], (cfg.input_size, cfg.input_size), interpolation=cv2.INTER_AREA)[...,np.newaxis] for i in range(x.shape[-1])  ] , axis=-1)
+    if x.shape[:2]!=(cfg.input_size, cfg.input_size):
+        x = np.concatenate( [ cv2.resize(x[...,i], (cfg.input_size, cfg.input_size), interpolation=cv2.INTER_AREA)[...,np.newaxis] for i in range(x.shape[-1])  ] , axis=-1)
     x = x.astype(np.float32)/255.0-np.array([[[0.485, 0.456, 0.406]]], dtype=np.float32) # [0,255] -> [0,1] -> -mean
     x = x / np.array([[[0.229, 0.224, 0.225]]], dtype=np.float32) # /std
     return x
@@ -110,7 +111,7 @@ def feature2bboxwdeg(p, th):
         confs += [cc]
     return bboxes, degs, confs
 
-def bbox_correct(preds, gt):
+def bbox_correct(preds, gt, iou_t=0.25, deg_t=30):
     correct = 0
     for p in preds:
         try:
@@ -140,7 +141,7 @@ def bbox_correct(preds, gt):
                     iou = inter/(union+1e-8)
                 except:
                     iou = 0
-            if min(deg_diff, deg_diff_m180)<cfg.deg_threshold and iou>cfg.iou_threshold:
+            if min(deg_diff, deg_diff_m180)<deg_t and iou>iou_t:
                 correct += 1
                 break
     return correct
