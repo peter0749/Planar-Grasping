@@ -214,9 +214,10 @@ class CornellGraspDataset(Dataset):
         pts, pts_idx = fetch_pcl(pcl_p)
         depth = pc2depth(pts, pts_idx, size=img.shape[:2])
         boxes = np.load(pos_p)
+        np.random.shuffle(boxes)
         # negative samples not used
-        if self.current_state=='train' and len(boxes)>cfg.max_sample_bbox:
-            boxes = boxes[np.random.choice(len(boxes), cfg.max_sample_bbox, replace=False)]
+        if self.current_state=='train':
+            boxes = boxes[:cfg.max_sample_bbox]
 
         crop_size=cfg.crop_size
         if self.current_state=='train':
@@ -256,9 +257,8 @@ class CornellGraspDataset(Dataset):
         label = torch.from_numpy( np.transpose(label, (2,0,1)).astype(np.float32)  ) # (h,w,c) -> (c,h,w)
         if self.return_box and len(boxes)<cfg.max_pad_bbox:
             boxes = np.pad(boxes, ((0,cfg.max_pad_bbox-len(boxes)), (0,0), (0,0)), mode='constant', constant_values=0)
-        if self.return_box and len(boxes)>cfg.max_pad_bbox:
-            boxes = boxes[np.random.choice(len(boxes), cfg.max_pad_bbox, replace=False)]
         if self.return_box:
+            boxes = boxes[:cfg.max_pad_bbox]
             assert boxes.shape==(cfg.max_pad_bbox, 4, 2)
             boxes = torch.from_numpy(boxes)
 

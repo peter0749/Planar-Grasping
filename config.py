@@ -3,7 +3,7 @@ import torch
 import numpy as np
 import random
 
-SEED = 9413 # For reproducability
+SEED = 113 # For reproducability
 if SEED is not None:
     random.seed(SEED)
     np.random.seed(SEED)
@@ -16,8 +16,8 @@ cornell_dataset_root = os.path.abspath(cornell_dataset_root)
 cornell_dataset_meta_root = os.path.abspath(cornell_dataset_meta_root)
 
 n_folds = 5 # 5 in paper
-max_sample_bbox = 7 # 5 in paper
-max_pad_bbox = 10 # unknown in paper
+max_sample_bbox = 9 # 5 in paper
+max_pad_bbox = 50 # unknown in paper
 lambda_coord = 5   # Same as YOLOv1
 lambda_rot = 7
 hinge_margin = 1
