@@ -1,10 +1,11 @@
-import config as cfg
+from . import config as cfg
 import cv2
 import numpy as np
 import imgaug as ia
 import imgaug.augmenters as iaa
 from imgaug.augmentables.kps import Keypoint, KeypointsOnImage
 from shapely.geometry import Polygon, MultiPoint
+import matplotlib.pyplot as plt
 
 sometimes = lambda aug: iaa.Sometimes(0.5, aug)
 
@@ -36,7 +37,52 @@ def get_imgaug():
     ))
     return seq_spatial, seq_color
 
+def visualize(imgs, bboxes, confs, objs, cats):
+    for i, img_c in enumerate(imgs):
+        for xx,cc,b,cat in zip(bboxes[i], confs[i], objs[i],cats[i]):
+            img_with_bbox = np.copy(img_c[...,::-1])
+            cmax = np.max(cc)
+            cmin = np.min(cc)
+            for x,c in zip(xx,cc):
+                cval = int((c-cmin+1)/(cmax-cmin+1)*7)
+                cv2.polylines(img_with_bbox, [np.round(np.asarray(x)).astype(np.int32)], True, (255, 255, 0), cval)
+            b = b.astype(np.int32)
+            ul = [b[0]-cfg.crop_size//2, b[1]-cfg.crop_size//2]
+            ur = [b[0]+cfg.crop_size//2, b[1]-cfg.crop_size//2]
+            dl = [b[0]-cfg.crop_size//2, b[1]+cfg.crop_size//2]
+            dr = [b[0]+cfg.crop_size//2, b[1]+cfg.crop_size//2]
+            bb = np.asarray([ ul, ur, dr, dl ], dtype=np.int32)
+            cv2.polylines(img_with_bbox, [bb], True, (0, 0, 255), 3)
+            ul_ = ul
+            ul_[1] -= 12
+            cv2.putText(img_with_bbox,cat,tuple(ul),cv2.FONT_HERSHEY_COMPLEX,np.max(img_with_bbox.shape)/400,(0,255,0),4)
+            img_with_bbox = img_with_bbox[...,::-1]
+            plt.imshow(img_with_bbox)
+            plt.show()
+
+def crop_image(img_, center_xy, pts=None, crop_size=320):
+    img = np.copy(img_)
+    h, w = img.shape[:2]
+    x, y = center_xy
+    s_offset = crop_size//2
+    l_offset = crop_size-s_offset
+    left, right, up, down = x-s_offset, x+l_offset, y-s_offset, y+l_offset
+    if not pts is None:
+        pts[...,0] -= left
+        pts[...,1] -= up
+    p_left, p_right, p_up, p_down = max(0, -left), max(0, right-w), max(0, -up), max(0, down-h)
+    if p_left+p_right+p_up+p_down>0:
+        if len(img.shape)==2:
+            img = np.pad(img, ((p_up, p_down),(p_left, p_right)), mode='symmetric')
+        else:
+            img = np.pad(img, ((p_up, p_down),(p_left, p_right),(0,0)), mode='symmetric')
+    left += p_left
+    up += p_up
+    img = img[up:up+crop_size, left:left+crop_size]
+    return img if pts is None else (img, pts)
+
 def center_crop(x, pts=None, crop_size=320):
+    '''
     crop_b = crop_size//2
     center_x = x.shape[1]//2
     center_y = x.shape[0]//2
@@ -49,6 +95,10 @@ def center_crop(x, pts=None, crop_size=320):
         pts[...,1] -= up_c
         return x[up_c:down_c, left_c:right_c], pts
     return x[up_c:down_c, left_c:right_c]
+    '''
+    center_x = x.shape[1]//2
+    center_y = x.shape[0]//2
+    return crop_image(x, (center_x, center_y), pts, crop_size)
 def preprocess_input(x):
     if x.shape[:2]!=(cfg.input_size, cfg.input_size):
         x = np.concatenate( [ cv2.resize(x[...,i], (cfg.input_size, cfg.input_size), interpolation=cv2.INTER_AREA)[...,np.newaxis] for i in range(x.shape[-1])  ] , axis=-1)
@@ -145,6 +195,8 @@ def bbox_correct(preds, gt, iou_t=0.25, deg_t=30):
                 correct += 1
                 break
     return correct
+
+
 
 if __name__=='__main__':
     from tqdm import tqdm

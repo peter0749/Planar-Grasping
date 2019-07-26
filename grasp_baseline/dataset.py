@@ -8,8 +8,8 @@ import cv2
 import glob
 import torch
 from torch.utils.data import Dataset
-import utils
-import config as cfg
+from . import utils
+from . import config as cfg
 
 @nb.njit
 def np_apply_along_axis(func1d, axis, arr):

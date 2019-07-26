@@ -5,3 +5,9 @@ DATA/*
 *.txt
 *.log
 *.ipynb_checkpoint
+ResNet101
+ResNet101/*
+VGG19_hinge
+VGG19_hinge/*
+VGG19_hinge_top1top5
+VGG19_hinge_top1top5/*

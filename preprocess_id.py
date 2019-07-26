@@ -2,9 +2,9 @@ import os
 import sys
 import numpy as np
 import glob
-import utils
-import config as cfg
-from dataset import *
+from grasp_baseline import utils
+from grasp_baseline import config as cfg
+from grasp_baseline.dataset import *
 from tqdm import tqdm
 
 if __name__=='__main__':

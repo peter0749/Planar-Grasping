@@ -1,4 +1,4 @@
-import config as cfg
+from . import config as cfg
 import torch
 import torch.nn as nn
 from torch.nn import Parameter

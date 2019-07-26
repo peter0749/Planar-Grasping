@@ -3,7 +3,7 @@ import sys
 import time
 import datetime
 import gc
-import config as cfg
+from grasp_baseline import config as cfg
 import argparse
 import numpy as np
 import torch
@@ -13,10 +13,10 @@ from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import SequentialSampler, RandomSampler, BatchSampler
 from torch import distributed
 from tensorboardX import SummaryWriter
-from loss import grasp_loss
-from dataset import CornellGraspDataset
-from models import GraspModel
-from utils import bbox_correct, feature2bboxwdeg
+from grasp_baseline.loss import grasp_loss
+from grasp_baseline.dataset import CornellGraspDataset
+from grasp_baseline.models import GraspModel
+from grasp_baseline.utils import bbox_correct, feature2bboxwdeg
 
 def parse_args():
     parser = argparse.ArgumentParser()
