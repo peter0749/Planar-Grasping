@@ -5,6 +5,7 @@ import selectivesearch
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
+from shapely.geometry import Polygon
 from pydarknet import Image, Detector
 from . import config as cfg
 from .dataset import (get_cornell_grasp_ids, get_cornell_id_meta, cornell_grasp_id2realpath,
@@ -33,20 +34,23 @@ class GraspDetector(object):
         self.model.eval()
         self.yolo = None
         ### FIX RELATIVE PATH ISSUE ###
-        with open(yolo_data, 'r') as fp:
-            yolo_data_content = fp.readlines()
-        with open(yolo_cfg, 'r') as fp:
-            yolo_cfg_content = fp.readlines()
-        with tempfile.NamedTemporaryFile() as tmp_yolo_cfg:
-            for line in fix_yolo_data_path(yolo_cfg_content):
-                tmp_yolo_cfg.write(bytes(line+'\n', encoding="utf-8"))
-            tmp_yolo_cfg.flush()
-            with tempfile.NamedTemporaryFile() as tmp_yolo_data:
-                for line in fix_yolo_data_path(yolo_data_content):
-                    tmp_yolo_data.write(bytes(line+'\n', encoding="utf-8"))
-                tmp_yolo_data.flush()
-                self.yolo = Detector(bytes(tmp_yolo_cfg.name, encoding="utf-8"), bytes(yolo_weight, encoding="utf-8"), 0, bytes(tmp_yolo_data.name, encoding="utf-8"))
-    def detect(self, images: list, depths: list, threshold: float = 0.0, yolo_threshold: float = 0.1, yolo_nms: float = 0.3, max_objs: int = 7):
+        try:
+            with open(yolo_data, 'r') as fp:
+                yolo_data_content = fp.readlines()
+            with open(yolo_cfg, 'r') as fp:
+                yolo_cfg_content = fp.readlines()
+            with tempfile.NamedTemporaryFile() as tmp_yolo_cfg:
+                for line in fix_yolo_data_path(yolo_cfg_content):
+                    tmp_yolo_cfg.write(bytes(line+'\n', encoding="utf-8"))
+                tmp_yolo_cfg.flush()
+                with tempfile.NamedTemporaryFile() as tmp_yolo_data:
+                    for line in fix_yolo_data_path(yolo_data_content):
+                        tmp_yolo_data.write(bytes(line+'\n', encoding="utf-8"))
+                    tmp_yolo_data.flush()
+                    self.yolo = Detector(bytes(tmp_yolo_cfg.name, encoding="utf-8"), bytes(yolo_weight, encoding="utf-8"), 0, bytes(tmp_yolo_data.name, encoding="utf-8"))
+        except:
+            self.yolo = None
+    def detect(self, images: list, depths: list, threshold: float = 0.0, yolo_threshold: float = 0.1, yolo_nms: float = 0.25, max_objs: int = 7):
         with torch.no_grad():
             return predict(self.model, self.yolo, images, depths, threshold=threshold, yolo_thresh=yolo_threshold, nms=yolo_nms, max_objs=max_objs)
 
@@ -60,11 +64,11 @@ def predict_yolo(net, img, n_rect=7, n_rect_search=200, yolo_thresh=0.1, nms=.25
     cats = []
     for cat, score, bounds in results:
         x, y, w, h = bounds
-        centers += [[x,y]]
+        centers += [[x-w/2,y-h/2,x+w/2,y+h/2]]
         scores += [score]
         cats += [cat]
     cats = np.asarray(cats)
-    centers = np.asarray(centers, dtype=np.int32)
+    centers = np.asarray(centers, dtype=np.float32)
     scores = np.asarray(scores, dtype=np.float32)
     order = np.argsort(-scores)[:n_rect]
     centers = centers[order]
@@ -89,31 +93,44 @@ def predict_selective_search(img, n_rect=7, n_rect_search=200):
     candidates = list(candidates)[:n_rect]
     for box in candidates:
         x, y, w, h = box
-        centers += [[x+w//2,y+h//2]]
+        centers += [[x,y,x+w,y+h]]
     if len(centers)==0: # if no object detected, center crop
-        centers = np.array([[img.shape[1]//2, img.shape[0]//2]], dtype=np.int32)
-    return np.asarray(centers, dtype=np.int32), np.zeros(len(centers), dtype=np.float32), np.asarray(['unk']*len(centers))
+        tx1 = (img.shape[1]-cfg.crop_size)/2
+        ty1 = (img.shape[0]-cfg.crop_size)/2
+        tx2 = (img.shape[1]+cfg.crop_size)/2
+        ty2 = (img.shape[0]+cfg.crop_size)/2
+        centers = np.array([[tx1,ty1,tx2,ty2]], dtype=np.float32)
+    return np.asarray(centers, dtype=np.float32), np.zeros(len(centers), dtype=np.float32), np.asarray(['unk']*len(centers))
 
 def preprocess_raw(img_, depth_, centers):
     imgs = []
     for center in centers:
+        cx, cy = int((center[0]+center[2])//2), int((center[1]+center[3])//2)
         img = np.copy(img_)
         depth = np.copy(depth_)
-        d = normalize_depth(crop_image(depth, center, crop_size=cfg.crop_size))
-        img = crop_image(img, center, crop_size=cfg.crop_size)
+        d = normalize_depth(crop_image(depth, (cx,cy), crop_size=cfg.crop_size))
+        img = crop_image(img, (cx,cy), crop_size=cfg.crop_size)
         img[...,-1] = d
         img = preprocess_input(img)
         imgs += [img]
     return imgs
 
 def bbox_postprocess(bbox, center):
+    cx, cy = int((center[0]+center[2])//2), int((center[1]+center[3])//2)
     crop_b = cfg.crop_size//2
-    left_c = center[0]-crop_b
-    up_c = center[1]-crop_b
+    left_c = cx-crop_b
+    up_c = cy-crop_b
     bbox = bbox*cfg.crop_size
     bbox[...,0] += left_c
     bbox[...,1] += up_c
-    return bbox
+    ## TODO: Add try ... except clause
+    p1 = Polygon(bbox)
+    p2 = Polygon([ [center[0],center[1]], [center[2],center[1]], [center[2],center[3]], [center[0],center[3]]  ])
+    if p1.intersects(p2):
+        insc = p1.intersection(p2).area
+        if insc/p1.area>0.1:
+            return bbox
+    return None
 
 def inference_bbox(model, inputs, threshold=0.0):
     inp = torch.from_numpy(np.transpose(inputs, (0, 3, 1, 2))) # (b, h, w, c) -> (b, c, h, w)
@@ -148,9 +165,15 @@ def predict(model, yolo_det, rgbs, depths, threshold=0.0, yolo_thresh=0.1, max_o
         bboxes, degs, confs = inference_bbox(model, rgds, threshold=threshold)
         new_bboxes, new_degs, new_confs, new_centers, new_cats, new_scores = [], [], [], [], [], []
         for bbox, deg, conf, center, cat, score in zip(np.split(bboxes, splits), np.split(degs, splits), np.split(confs, splits), np.split(centers, splits), np.split(cats, splits), np.split(scores, splits)):
+            bbox = list(bbox)
             empty_id = []
             for i in range(len(center)):
-                bbox[i] = [ bbox_postprocess(b, center[i]) for b in bbox[i]  ]
+                bbox_ = []
+                for b in bbox[i]:
+                    processed_sub_bbox = bbox_postprocess(b, center[i])
+                    if not processed_sub_bbox is None:
+                        bbox_.append(processed_sub_bbox)
+                bbox[i] = bbox_
                 if len(bbox[i])==0:
                     empty_id += [i]
             bbox = np.delete(bbox, empty_id, 0)

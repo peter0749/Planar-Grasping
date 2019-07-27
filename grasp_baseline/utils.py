@@ -47,15 +47,15 @@ def visualize(imgs, bboxes, confs, objs, cats):
                 cval = int((c-cmin+1)/(cmax-cmin+1)*7)
                 cv2.polylines(img_with_bbox, [np.round(np.asarray(x)).astype(np.int32)], True, (255, 255, 0), cval)
             b = b.astype(np.int32)
-            ul = [b[0]-cfg.crop_size//2, b[1]-cfg.crop_size//2]
-            ur = [b[0]+cfg.crop_size//2, b[1]-cfg.crop_size//2]
-            dl = [b[0]-cfg.crop_size//2, b[1]+cfg.crop_size//2]
-            dr = [b[0]+cfg.crop_size//2, b[1]+cfg.crop_size//2]
+            ul = [b[0],b[1]]
+            ur = [b[2],b[1]]
+            dl = [b[0],b[3]]
+            dr = [b[2],b[3]]
             bb = np.asarray([ ul, ur, dr, dl ], dtype=np.int32)
             cv2.polylines(img_with_bbox, [bb], True, (0, 0, 255), 3)
             ul_ = ul
-            ul_[1] -= 12
-            cv2.putText(img_with_bbox,cat,tuple(ul),cv2.FONT_HERSHEY_COMPLEX,np.max(img_with_bbox.shape)/400,(0,255,0),4)
+            ul_[1] -= 3
+            cv2.putText(img_with_bbox,cat,tuple(ul_),cv2.FONT_HERSHEY_COMPLEX,np.max(img_with_bbox.shape)/400,(0,255,0),4)
             img_with_bbox = img_with_bbox[...,::-1]
             plt.imshow(img_with_bbox)
             plt.show()
