@@ -43,7 +43,7 @@ Download and decompress pre-train weights to `${This REPO}/grasp_baseline/weight
 ### In any python script
 from grasp_baseline.inference import GraspDetector
 detector = GraspDetector()
-grasps, degrees, object_bounding_boxes, categories, graspscores = detector.detect([img1, img2, ...], [depth1, depth2, ...])
+grasps, degrees, graspscores, object_bounding_boxes, categories, yolo_scores = detector.detect([img1, img2, ...], [depth1, depth2, ...])
 ```
 
 Where the first augment is a list of RGB images, the second is a list of depth images.
