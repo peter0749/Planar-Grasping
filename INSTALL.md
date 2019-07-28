@@ -1,6 +1,6 @@
 ### Pre-requisites
 
-Python>=3.5
+Python>=3.5 (3.6.1 would be best)
 
 Python3-dev
 
