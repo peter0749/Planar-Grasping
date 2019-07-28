@@ -1,0 +1,10 @@
+[package]
+name = "grasp_baseline"
+version = "0.1.0"
+authors = ["Kuang-Yu Jeng <jengku@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+pyo3 = "0.7.0"
+inline-python = "0.3.1"
+numpy = "0.6.0"
