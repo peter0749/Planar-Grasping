@@ -57,3 +57,10 @@ visualize([img1, img2, ...], grasps, graspscores, object_bounding_boxes, categor
 ### Example
 
 [inference_test.ipynb](./inference_test.ipynb)
+
+### Test on RUST
+
+```
+cd cargo_test
+cargo run
+```
