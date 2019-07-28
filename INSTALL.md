@@ -33,6 +33,10 @@ pip install -e .
 
 This will install `grasp_baseline`
 
+Download and decompress pre-train weights to `${This REPO}/grasp_baseline/weights`
+
+[weights](https://drive.google.com/drive/folders/11KUFxY68539TQKutcn_1fgeVH2mkS2K0)
+
 ### Usage
 
 ```
