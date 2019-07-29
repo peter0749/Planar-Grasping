@@ -166,14 +166,27 @@ def predict(model, yolo_det, rgbs, depths, threshold=0.0, yolo_thresh=0.1, max_o
         new_bboxes, new_degs, new_confs, new_centers, new_cats, new_scores = [], [], [], [], [], []
         for bbox, deg, conf, center, cat, score in zip(np.split(bboxes, splits), np.split(degs, splits), np.split(confs, splits), np.split(centers, splits), np.split(cats, splits), np.split(scores, splits)):
             bbox = list(bbox)
+            deg = list(deg)
+            conf = list(conf)
             empty_id = []
             for i in range(len(center)):
                 bbox_ = []
-                for b in bbox[i]:
+                deg_ = []
+                conf_ = []
+                for b,d,c in zip(bbox[i],deg[i],conf[i]):
                     processed_sub_bbox = bbox_postprocess(b, center[i])
                     if not processed_sub_bbox is None:
                         bbox_.append(processed_sub_bbox)
-                bbox[i] = bbox_
+                        deg_.append(d)
+                        conf_.append(c)
+                bbox_ = np.asarray(bbox_, dtype=np.float32)
+                deg_  = np.asarray(deg_,  dtype=np.float32)
+                conf_ = np.asarray(conf_, dtype=np.float32)
+                conf_od = np.argsort(-conf_) # sort by grasping confidence
+                #conf_od = np.arange(len(conf_)).astype(np.int32)
+                bbox[i] = bbox_[conf_od]
+                deg[i] = deg_[conf_od]
+                conf[i] = conf_[conf_od]
                 if len(bbox[i])==0:
                     empty_id += [i]
             bbox = np.delete(bbox, empty_id, 0)
@@ -182,7 +195,7 @@ def predict(model, yolo_det, rgbs, depths, threshold=0.0, yolo_thresh=0.1, max_o
             center = np.delete(center, empty_id, 0)
             score = np.delete(score, empty_id, 0)
             cat = np.delete(cat, empty_id, 0)
-            i = np.argsort([-len(x) for x in bbox])
+            i = np.argsort([-np.max(x) for x in conf])
             new_bboxes += [bbox[i]]
             new_degs += [deg[i]]
             new_confs += [conf[i]]
@@ -190,5 +203,3 @@ def predict(model, yolo_det, rgbs, depths, threshold=0.0, yolo_thresh=0.1, max_o
             new_scores += [score[i]]
             new_cats += [cat[i]]
     return new_bboxes, new_degs, new_confs, new_centers, new_cats, new_scores
-
-
