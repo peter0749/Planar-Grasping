@@ -23,7 +23,7 @@ def fix_yolo_data_path(data):
 
 class GraspDetector(object):
     def __init__(self, backbone: str = 'vgg19_bn', weight_path: str = os.path.join(os.path.split(__file__)[0],"weights","grasp_model.pth"), f16: bool = False, cuda: bool = True,
-            yolo_cfg: str = os.path.join(os.path.split(__file__)[0],"cfg","yolo9000.cfg"), yolo_weight: str = os.path.join(os.path.split(__file__)[0],"weights","yolo9000.weights"), yolo_data: str = os.path.join(os.path.split(__file__)[0],"cfg","combine9k.data")
+            yolo_cfg: str = os.path.join(os.path.split(__file__)[0],"cfg","yolov3-spp.cfg"), yolo_weight: str = os.path.join(os.path.split(__file__)[0],"weights","yolov3-spp.weights"), yolo_data: str = os.path.join(os.path.split(__file__)[0],"cfg","coco.data")
             ,**kwargs):
         self.model = GraspModel(backbone=backbone, with_fc=False)
         if cuda:
