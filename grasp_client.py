@@ -17,7 +17,7 @@ class GraspHandler(object):
 
         command = img_b64 + " " + depth_b64 + "\n"
         self.sub_process.stdin.write(command.encode())
-        response = self.sub_process.stdout.readline()
+        response = self.sub_process.stdout.readline().decode("utf-8")
         result = json.loads(response)
         return np.asarray(result)
     def __del__(self):
