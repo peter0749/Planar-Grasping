@@ -5,7 +5,7 @@ import subprocess
 import base64
 
 class GraspHandler(object):
-    def __init__(self, grasp_provider="./grasp_provider.sh"):
+    def __init__(self, grasp_provider="./grasp_provider.py"):
         self.sub_process = subprocess.Popen((grasp_provider,), stdout=subprocess.PIPE, stdin=subprocess.PIPE)
     def get(self, img, depth):
         with io.BytesIO() as fp:
