@@ -1,4 +1,4 @@
-#!/usr/bin/env /home/test/grasp_models_pyvenv/bin/python
+#!/usr/bin/env /home/peter/anaconda3/envs/dnn/bin/python
 import sys
 if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
     sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
@@ -10,6 +10,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from grasp_baseline.inference import GraspDetector
+detector = GraspDetector(cuda=True)
 
 def unfold(x):
     if isinstance(x, np.ndarray):
@@ -19,7 +20,6 @@ def unfold(x):
             x[i] = unfold(x[i])
     return x
 
-detector = GraspDetector(cuda=True)
 # block input:
 for line in sys.stdin:
     paths = line.strip().split()
@@ -33,9 +33,9 @@ for line in sys.stdin:
     bboxes, degs, confs, centers, cats, scores = detector.detect([img], [depth], threshold=-2, yolo_threshold=0.05)
 
     result_str = ''
-    #best_grasp = bboxes[0][0][0]
-    #grasp_center = np.mean(best_grasp, axis=0)
-    #result_str = json.dumps(grasp_center.tolist(), ensure_ascii=True)
-    result_str = json.dumps({'grasp': unfold(bboxes), 'rot': unfold(degs), 'grasp_conf': unfold(confs), 'bbox': unfold(centers), 'class': unfold(cats), 'score': unfold(scores)}, ensure_ascii=True)
+    try:
+        result_str = json.dumps({'grasp': unfold(bboxes[0]), 'confidence': unfold(confs[0]), 'bbox': unfold(centers[0])}, ensure_ascii=True)
+    except:
+        pass
     print(result_str)
     sys.stdout.flush()

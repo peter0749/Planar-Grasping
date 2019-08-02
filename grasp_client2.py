@@ -5,8 +5,8 @@ import subprocess
 import base64
 
 class GraspHandler(object):
-    def __init__(self, grasp_provider="./grasp_provider.py"):
-        self.sub_process = subprocess.Popen((grasp_provider,), stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+    def __init__(self, grasp_provider="/home/peter/grasp_multiObject_multiGrasp/tools/graspRGD_provider.py", net='res50', dataset='grasp', model='/home/peter/grasp_multiObject_multiGrasp/output'):
+        self.sub_process = subprocess.Popen((grasp_provider,'--net',net,'--dataset','grasp','--model',model), stdout=subprocess.PIPE, stdin=subprocess.PIPE)
     def get(self, img, depth):
         with io.BytesIO() as fp:
             np.save(fp, img, allow_pickle=True, fix_imports=True)
@@ -18,9 +18,8 @@ class GraspHandler(object):
         command = img_b64 + " " + depth_b64 + "\n"
         self.sub_process.stdin.write(command.encode())
         response = self.sub_process.stdout.readline().decode("utf-8")
-        return json.loads(response)
-    def best_grasp(self, img, depth):
-        return np.asarray(self.get(img, depth)['grasp'][0][0])
+        result = json.loads(response)
+        return np.asarray(result)
     def __del__(self):
         self.sub_process.kill()
 
@@ -35,9 +34,9 @@ if __name__ == '__main__':
     for (img_p,depth_p) in paths:
         img = cv2.imread(img_p, cv2.IMREAD_COLOR)[...,::-1]
         depth = np.load(depth_p, allow_pickle=True, fix_imports=True)
-        pts = test.best_grasp(img,depth)
-        img_ = np.copy(img)
-        cv2.polylines(img_, [pts.astype(np.int32)], True, (255,0,0), 5)
+        grasps = test.get(img,depth).astype(np.int32)
+        img_ = img.copy()
+        cv2.polylines(img_,grasps[:1],True,(0,0,255),3)
         plt.imshow(img_)
         plt.show()
     del test
