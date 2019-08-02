@@ -10,6 +10,15 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from grasp_baseline.inference import GraspDetector
+
+def unfold(x):
+    if isinstance(x, np.ndarray):
+        x = x.tolist()
+    if isinstance(x, list) or isinstance(x, tuple):
+        for i in range(len(x)):
+            x[i] = unfold(x[i])
+    return x
+
 detector = GraspDetector(cuda=True)
 # block input:
 for line in sys.stdin:
@@ -24,11 +33,9 @@ for line in sys.stdin:
     bboxes, degs, confs, centers, cats, scores = detector.detect([img], [depth], threshold=-2, yolo_threshold=0.05)
 
     result_str = ''
-    try:
-        best_grasp = bboxes[0][0][0]
-        grasp_center = np.mean(best_grasp, axis=0)
-        result_str = json.dumps(grasp_center.tolist(), ensure_ascii=True)
-    except:
-        pass
+    #best_grasp = bboxes[0][0][0]
+    #grasp_center = np.mean(best_grasp, axis=0)
+    #result_str = json.dumps(grasp_center.tolist(), ensure_ascii=True)
+    result_str = json.dumps({'grasp': unfold(bboxes), 'rot': unfold(degs), 'grasp_conf': unfold(confs), 'bbox': unfold(centers), 'class': unfold(cats), 'score': unfold(scores)}, ensure_ascii=True)
     print(result_str)
     sys.stdout.flush()

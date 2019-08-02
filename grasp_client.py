@@ -18,8 +18,14 @@ class GraspHandler(object):
         command = img_b64 + " " + depth_b64 + "\n"
         self.sub_process.stdin.write(command.encode())
         response = self.sub_process.stdout.readline().decode("utf-8")
-        result = json.loads(response)
-        return np.asarray(result)
+        try:
+            response_dict = json.loads(response)
+            best_grasp = np.asarray(response_dict['grasp'][0][0][0], dtype=np.float32)
+            best_grasp_center = best_grasp.mean(axis=0)
+            result = best_grasp_center
+        except:
+            result = np.array([],dtype=np.float32)
+        return result
     def __del__(self):
         self.sub_process.kill()
 
