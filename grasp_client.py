@@ -21,6 +21,18 @@ class GraspHandler(object):
         return json.loads(response)
     def best_grasp(self, img, depth):
         return np.asarray(self.get(img, depth)['grasp'][0][0])
+    def get_topK(self, img, depth, K=5):
+        all_grasp = []
+        all_score = []
+        results = self.get(img, depth)
+        grasps = results['grasp']
+        scores = results['confidence']
+        for i, grasp_c in enumerate(grasps):
+            for j, grasp_b in enumerate(grasp_c):
+                all_grasp.append( grasp_b )
+                all_score.append( -scores[i][j] )
+        all_grasp = np.asarray(all_grasp)
+        return all_grasp[np.argsort(all_score)[:K]]
     def __del__(self):
         self.sub_process.kill()
 
@@ -35,9 +47,9 @@ if __name__ == '__main__':
     for (img_p,depth_p) in paths:
         img = cv2.imread(img_p, cv2.IMREAD_COLOR)[...,::-1]
         depth = np.load(depth_p, allow_pickle=True, fix_imports=True)
-        pts = test.best_grasp(img,depth)
+        pts = test.get_topK(img,depth,K=5)
         img_ = np.copy(img)
-        cv2.polylines(img_, [pts.astype(np.int32)], True, (255,0,0), 5)
+        cv2.polylines(img_, pts.astype(np.int32), True, (255,0,0), 5)
         plt.imshow(img_)
         plt.show()
     del test
