@@ -57,27 +57,22 @@ class GraspDetector(object):
 def predict_yolo(net, img, n_rect=7, n_rect_search=200, yolo_thresh=0.1, nms=.25):
     img2 = Image(img)
     #detect(self, Image image, float thresh=.5, float hier_thresh=.5, float nms=.45)
-    results = [] if net is None else net.detect(img2, thresh=yolo_thresh, nms=nms)
+    results = [] if net is None else net.detect_foreground(img2, thresh=yolo_thresh, nms=nms)
     #results = []
     centers = []
     scores = []
-    cats = []
-    for cat, score, bounds in results:
+    for score, bounds in results:
         x, y, w, h = bounds
         centers += [[x-w/2,y-h/2,x+w/2,y+h/2]]
         scores += [score]
-        cats += [cat]
-    cats = np.asarray(cats)
     centers = np.asarray(centers, dtype=np.float32)
     scores = np.asarray(scores, dtype=np.float32)
     order = np.argsort(-scores)[:n_rect]
     centers = centers[order]
     scores = scores[order]
-    cats = cats[order]
-    cats = cats.astype(str)
-    if len(centers)==0: # if no object detected, center crop
+    if len(centers)==0: # if no object detected
         return predict_selective_search(img, n_rect=n_rect, n_rect_search=n_rect_search)
-    return centers, scores, cats
+    return centers, scores
 
 def predict_selective_search(img, n_rect=7, n_rect_search=200):
     rects = selectivesearch.selective_search(img, scale=500, sigma=0.9, min_size=10)[1][:n_rect_search]
@@ -100,7 +95,7 @@ def predict_selective_search(img, n_rect=7, n_rect_search=200):
         tx2 = (img.shape[1]+cfg.crop_size)/2
         ty2 = (img.shape[0]+cfg.crop_size)/2
         centers = np.array([[tx1,ty1,tx2,ty2]], dtype=np.float32)
-    return np.asarray(centers, dtype=np.float32), np.zeros(len(centers), dtype=np.float32), np.asarray(['unk']*len(centers))
+    return np.asarray(centers, dtype=np.float32), np.zeros(len(centers), dtype=np.float32)
 
 def preprocess_raw(img_, depth_, centers):
     imgs = []
@@ -148,23 +143,21 @@ def predict(model, yolo_det, rgbs, depths, threshold=0.0, yolo_thresh=0.1, max_o
     with torch.no_grad():
         rgds = []
         centers = []
-        cats = []
         scores = []
         splits = []
         for rgb, depth in zip(rgbs, depths):
-            center, score, cat = predict_yolo(yolo_det, rgb, yolo_thresh=yolo_thresh, n_rect=max_objs, nms=nms)
+            center, score = predict_yolo(yolo_det, rgb, yolo_thresh=yolo_thresh, n_rect=max_objs, nms=nms)
             rgd = preprocess_raw(rgb, depth, center)
             rgds += list(rgd)
             centers += list(center)
-            cats += list(cat)
             scores += list(score)
             splits += [len(centers)]
         if len(splits)>0:
             del splits[-1]
         rgds = np.asarray(rgds,dtype=np.float32)
         bboxes, degs, confs = inference_bbox(model, rgds, threshold=threshold)
-        new_bboxes, new_degs, new_confs, new_centers, new_cats, new_scores = [], [], [], [], [], []
-        for bbox, deg, conf, center, cat, score in zip(np.split(bboxes, splits), np.split(degs, splits), np.split(confs, splits), np.split(centers, splits), np.split(cats, splits), np.split(scores, splits)):
+        new_bboxes, new_degs, new_confs, new_centers, new_scores = [], [], [], [], []
+        for bbox, deg, conf, center, score in zip(np.split(bboxes, splits), np.split(degs, splits), np.split(confs, splits), np.split(centers, splits), np.split(scores, splits)):
             bbox = list(bbox)
             deg = list(deg)
             conf = list(conf)
@@ -194,12 +187,10 @@ def predict(model, yolo_det, rgbs, depths, threshold=0.0, yolo_thresh=0.1, max_o
             conf = np.delete(conf, empty_id, 0)
             center = np.delete(center, empty_id, 0)
             score = np.delete(score, empty_id, 0)
-            cat = np.delete(cat, empty_id, 0)
             i = np.argsort([-np.max(x) for x in conf])
             new_bboxes += [bbox[i]]
             new_degs += [deg[i]]
             new_confs += [conf[i]]
             new_centers += [center[i]]
             new_scores += [score[i]]
-            new_cats += [cat[i]]
-    return new_bboxes, new_degs, new_confs, new_centers, new_cats, new_scores
+    return new_bboxes, new_degs, new_confs, new_centers, new_scores

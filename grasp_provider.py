@@ -30,7 +30,7 @@ for line in sys.stdin:
     depth_b64 = depth_b64.strip()
     img = np.load(io.BytesIO(base64.b64decode(img_b64)), allow_pickle=True, fix_imports=True)
     depth = np.load(io.BytesIO(base64.b64decode(depth_b64)), allow_pickle=True, fix_imports=True)
-    bboxes, degs, confs, centers, cats, scores = detector.detect([img], [depth], threshold=-2, yolo_threshold=0.05)
+    bboxes, degs, confs, centers, scores = detector.detect([img], [depth], threshold=-2, yolo_threshold=0.05)
 
     result_str = ''
     try:

@@ -37,9 +37,9 @@ def get_imgaug():
     ))
     return seq_spatial, seq_color
 
-def visualize(imgs, bboxes, confs, objs, cats):
+def visualize(imgs, bboxes, confs, objs):
     for i, img_c in enumerate(imgs):
-        for xx,cc,b,cat in zip(bboxes[i], confs[i], objs[i],cats[i]):
+        for xx,cc,b in zip(bboxes[i], confs[i], objs[i]):
             img_with_bbox = np.copy(img_c[...,::-1])
             cmax = np.max(cc)
             cmin = np.min(cc)
@@ -53,9 +53,6 @@ def visualize(imgs, bboxes, confs, objs, cats):
             dr = [b[2],b[3]]
             bb = np.asarray([ ul, ur, dr, dl ], dtype=np.int32)
             cv2.polylines(img_with_bbox, [bb], True, (0, 0, 255), 3)
-            ul_ = ul
-            ul_[1] -= 3
-            cv2.putText(img_with_bbox,cat,tuple(ul_),cv2.FONT_HERSHEY_COMPLEX,np.max(img_with_bbox.shape)/400,(0,255,0),4)
             img_with_bbox = img_with_bbox[...,::-1]
             plt.imshow(img_with_bbox)
             plt.show()
