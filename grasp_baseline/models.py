@@ -69,12 +69,14 @@ class GraspModel(nn.Module):
             self.conf_layer = nn.Conv2d(512, 1, kernel_size=1, stride=1, padding=0, bias=True)
             self.xy_layer = nn.Conv2d(512, 2, kernel_size=1, stride=1, padding=0, bias=True)
             self.wh_layer = nn.Conv2d(512, 2, kernel_size=1, stride=1, padding=0, bias=True)
-            self.cossine_layer = nn.Conv2d(512, 2, kernel_size=1, stride=1, padding=0, bias=True)
+            #self.cossine_layer = nn.Conv2d(512, 2, kernel_size=1, stride=1, padding=0, bias=True)
+            self.angle_linear = nn.Conv2d(512, cfg.n_orientations, kernel_size=1, stride=1, padding=0, bias=True)
         else:
             self.conf_layer = nn.Conv2d(self.last_channel_n[backbone], 1, kernel_size=1, stride=1, padding=0, bias=True)
             self.xy_layer = nn.Conv2d(self.last_channel_n[backbone], 2, kernel_size=1, stride=1, padding=0, bias=True)
             self.wh_layer = nn.Conv2d(self.last_channel_n[backbone], 2, kernel_size=1, stride=1, padding=0, bias=True)
-            self.cossine_layer = nn.Conv2d(self.last_channel_n[backbone], 2, kernel_size=1, stride=1, padding=0, bias=True)
+            #self.cossine_layer = nn.Conv2d(self.last_channel_n[backbone], 2, kernel_size=1, stride=1, padding=0, bias=True)
+            self.angle_linear = nn.Conv2d(self.last_channel_n[backbone], cfg.n_orientations, kernel_size=1, stride=1, padding=0, bias=True)
         self.forward = self.with_fc_forward if self.with_fc else self.without_fc_forward
 
     def with_fc_forward(self, x):
@@ -87,7 +89,9 @@ class GraspModel(nn.Module):
         conf = self.conf_layer(x)
         xy = torch.sigmoid(self.xy_layer(x))
         wh = torch.exp(self.wh_layer(x)) # YOLOv2
-        tha = self.cossine_layer(x)
+        #tha = self.cossine_layer(x)
+        tha = self.angle_linear(x)
+        tha = torch.sigmoid(tha)
         x = torch.cat((conf, xy, wh, tha), 1) # (b, c, h, w)
         return x
 
@@ -96,7 +100,9 @@ class GraspModel(nn.Module):
         conf = self.conf_layer(x)
         xy = torch.sigmoid(self.xy_layer(x))
         wh = torch.exp(self.wh_layer(x)) # YOLOv2
-        tha = self.cossine_layer(x)
+        #tha = self.cossine_layer(x)
+        tha = self.angle_linear(x)
+        tha = torch.sigmoid(tha)
         x = torch.cat((conf, xy, wh, tha), 1) # (b, c, h, w)
         return x
 

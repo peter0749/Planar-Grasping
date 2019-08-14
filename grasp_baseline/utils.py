@@ -114,7 +114,9 @@ def aug_data(seq, img, pts=None):
 
 def feature2bboxwdeg(p, th):
     # p: (b, c, h, w)
-    c, x, y, w, h, cos2a, sin2a = [ t[:,0] for t in np.split(p, 7, axis=1) ] # 7*(b,h,w)
+    c, x, y, w, h = [ t[:,0] for t in np.split(p[:,:5], 5, axis=1) ] # 5*(b,h,w)
+    angles_prob = p[:,5:] # angles_prob: (b, n_ori, h, w)
+    angles = np.argmax(angles_prob, axis=1).astype(np.float32) * cfg.orientation_base # angles: (b, h, w)
     batch_size = c.shape[0]
     bboxes = []
     degs = []
@@ -127,11 +129,7 @@ def feature2bboxwdeg(p, th):
         yy = np.asarray([ idx[0]+y[b, idx[0], idx[1]] for idx in argpos ])
         ww = np.asarray([ w[b, idx[0], idx[1]] for idx in argpos ])
         hh = np.asarray([ h[b, idx[0], idx[1]] for idx in argpos ])
-        c2a = np.asarray([ cos2a[b, idx[0], idx[1]] for idx in argpos ])
-        s2a = np.asarray([ sin2a[b, idx[0], idx[1]] for idx in argpos ])
-        tan_a = (1-c2a) / s2a
-        tan_a[tan_a!=tan_a] = 0
-        aa = np.arctan(tan_a)
+        aa = np.asarray([ angles[b, idx[0], idx[1]] for idx in argpos ])
         N  = len(aa)
         v = np.array([[-hh/2, ww/2], # v0
                       [ hh/2, ww/2], # v1
