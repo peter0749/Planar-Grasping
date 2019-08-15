@@ -36,8 +36,7 @@ def grasp_loss(inputs, target):
     conf_loss = conf_loss.sum(-1).sum(-1).sum(-1) # shape: (b,)
 
     loss = lambda_coord*coord_loss + lambda_rot*rot_loss + conf_loss # shape: (b,)
-    loss[loss!=loss] = 0
-    loss[loss==np.inf] = 0
+    loss = torch.clamp(loss, 0, 1000)
     return loss.mean()
 
 if __name__=='__main__':

@@ -27,7 +27,7 @@ grasp_threshold = 0.3 # Unknown in paper
 iou_threshold_easy = 0.25
 deg_threshold_easy = 30
 
-n_orientations = 15
+n_orientations = 16
 orientation = np.linspace(0, np.pi, n_orientations+1)[:-1]
 orientation_base = orientation[1]
 crop_range = 50
