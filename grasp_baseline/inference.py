@@ -21,6 +21,20 @@ def fix_yolo_data_path(data):
             data[n] = (line[:i+1] + os.path.join(os.path.split(__file__)[0], line[i+1:])).strip()
     return data
 
+class SingleObjectGraspDetector(object):
+    def __init__(self, backbone: str = 'vgg19_bn', weight_path: str = os.path.join(os.path.split(__file__)[0],"weights","grasp_model.pth"), f16: bool = False, cuda: bool = True
+            ,**kwargs):
+        self.model = GraspModel(backbone=backbone, with_fc=False)
+        if cuda:
+            self.model = self.model.cuda()
+        state_dict = torch.load(weight_path) if cuda else torch.load(weight_path, map_location='cpu')
+        self.model.load_state_dict(state_dict, strict=False)
+        self.model = self.model.half() if f16 else self.model.float()
+        self.model.eval()
+    def detect(self, image, depth, bbox, threshold: float = 0.0):
+        with torch.no_grad():
+            return predict_single_object(self.model, image, depth, bbox, threshold=threshold)
+
 class GraspDetector(object):
     def __init__(self, backbone: str = 'vgg19_bn', weight_path: str = os.path.join(os.path.split(__file__)[0],"weights","grasp_model.pth"), f16: bool = False, cuda: bool = True,
             yolo_cfg: str = os.path.join(os.path.split(__file__)[0],"cfg","yolov3-spp.cfg"), yolo_weight: str = os.path.join(os.path.split(__file__)[0],"weights","yolov3-spp.weights"), yolo_data: str = os.path.join(os.path.split(__file__)[0],"cfg","coco.data")
@@ -123,7 +137,7 @@ def bbox_postprocess(bbox, center):
     p2 = Polygon([ [center[0],center[1]], [center[2],center[1]], [center[2],center[3]], [center[0],center[3]]  ])
     if p1.intersects(p2):
         insc = p1.intersection(p2).area
-        if insc/p1.area>0.1:
+        if insc/p1.area>0.75:
             return bbox
     return None
 
@@ -137,6 +151,23 @@ def inference_bbox(model, inputs, threshold=0.0):
     with torch.no_grad():
         bboxes, degs, confs = feature2bboxwdeg(model(inp).detach().cpu().numpy(), threshold)
     return bboxes, degs, confs
+
+def predict_single_object(model, rgb, depth, bbox, threshold=0.0):
+    model.eval()
+    rgd = preprocess_raw(rgb, depth, [bbox])
+    with torch.no_grad():
+        grasps, _, confs = inference_bbox(model, rgd, threshold=threshold)
+    grasps = grasps[0]
+    confs = confs[0]
+    new_grasps = []
+    new_confs = []
+    for g,c in zip(grasps,confs):
+        grasp_postprocessed = bbox_postprocess(g, bbox)
+        if grasp_postprocessed is None:
+            continue
+        new_grasps.append(grasp_postprocessed)
+        new_confs.append(c)
+    return np.asarray(new_grasps), np.asarray(new_confs)
 
 def predict(model, yolo_det, rgbs, depths, threshold=0.0, yolo_thresh=0.1, max_objs=7, nms=.25):
     model.eval()
