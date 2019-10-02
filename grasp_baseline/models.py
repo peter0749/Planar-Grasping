@@ -83,7 +83,7 @@ class GraspModel(nn.Module):
         x = self.feature_forward(x)
         x = x.view(x.size(0), -1) # (b, c*h*w)
         x = F.leaky_relu(self.fc1(x), 0.1) # (b, 512)
-        x = F.dropout(x, 0.5)
+        x = F.dropout(x, 0.5, training=self.training)
         x = F.leaky_relu(self.fc2(x), 0.1) # (b, 512*7*7)
         x = x.view(x.size(0), 512, cfg.grid_size, cfg.grid_size) # (b, 512, 7 ,7)
         conf = self.conf_layer(x)
