@@ -11,3 +11,5 @@ VGG19_hinge
 VGG19_hinge/*
 VGG19_hinge_top1top5
 VGG19_hinge_top1top5/*
+grasp_baseline/weights
+grasp_baseline/weights/*
