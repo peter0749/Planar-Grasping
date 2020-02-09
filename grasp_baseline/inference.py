@@ -10,7 +10,7 @@ from pydarknet import Image, Detector
 from . import config as cfg
 from .dataset import (get_cornell_grasp_ids, get_cornell_id_meta, cornell_grasp_id2realpath,
                             parse_pcl, pc2depth, parse_bbox, normalize_depth, parse_img)
-from .models import GraspModel
+from .models import grasp_model
 from .utils import (center_crop, crop_image, preprocess_input,feature2bboxwdeg)
 
 def fix_yolo_data_path(data):
@@ -24,7 +24,7 @@ def fix_yolo_data_path(data):
 class SingleObjectGraspDetector(object):
     def __init__(self, backbone: str = 'vgg19_bn', weight_path: str = os.path.join(os.path.split(__file__)[0],"weights","grasp_model.pth"), f16: bool = False, cuda: bool = True
             ,**kwargs):
-        self.model = GraspModel(backbone=backbone, with_fc=False)
+        self.model = grasp_model(backbone)
         if cuda:
             self.model = self.model.cuda()
         state_dict = torch.load(weight_path) if cuda else torch.load(weight_path, map_location='cpu')
@@ -39,7 +39,7 @@ class GraspDetector(object):
     def __init__(self, backbone: str = 'vgg19_bn', weight_path: str = os.path.join(os.path.split(__file__)[0],"weights","grasp_model.pth"), f16: bool = False, cuda: bool = True,
             yolo_cfg: str = os.path.join(os.path.split(__file__)[0],"cfg","yolov3-spp.cfg"), yolo_weight: str = os.path.join(os.path.split(__file__)[0],"weights","yolov3-spp.weights"), yolo_data: str = os.path.join(os.path.split(__file__)[0],"cfg","coco.data")
             ,**kwargs):
-        self.model = GraspModel(backbone=backbone, with_fc=False)
+        self.model = grasp_model(backbone)
         if cuda:
             self.model = self.model.cuda()
         state_dict = torch.load(weight_path) if cuda else torch.load(weight_path, map_location='cpu')

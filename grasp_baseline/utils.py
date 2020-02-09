@@ -7,16 +7,16 @@ from imgaug.augmentables.kps import Keypoint, KeypointsOnImage
 from shapely.geometry import Polygon, MultiPoint
 import matplotlib.pyplot as plt
 
-sometimes = lambda aug: iaa.Sometimes(0.5, aug)
+sometimes = lambda aug: iaa.Sometimes(0.6, aug)
 
 def get_imgaug():
-    seq_spatial = sometimes(iaa.Affine(
-                translate_px={"x": (-60, 60), "y": (-60, 60)}, # translate by -20 to +20 percent (per axis)
-                rotate=(-170, 170), # rotate by -170 to +170 degrees
+    seq_spatial = iaa.Affine(
+                translate_px={"x": (-70, 70), "y": (-70, 70)}, # translate by -20 to +20 percent (per axis)
+                rotate=(-175, 175), # rotate by -170 to +170 degrees
                 order=[0, 1], # use nearest neighbour or bilinear interpolation (fast)
-                cval=(0, 255), # if mode is constant, use a cval between 0 and 255
+                cval=(30, 200),
                 mode=ia.ALL # use any of scikit-image's warping modes (see 2nd image from the top for examples)
-            ))
+            )
     seq_color = sometimes(iaa.Sequential(
         [
             iaa.SomeOf((1, 3),
@@ -25,10 +25,14 @@ def get_imgaug():
                         iaa.GaussianBlur((0, 3.0)), # blur images with a sigma between 0 and 3.0
                         iaa.AverageBlur(k=(2, 7)), # blur image using local means with kernel sizes between 2 and 7
                         iaa.MedianBlur(k=(3, 11)), # blur image using local medians with kernel sizes between 2 and 7
+                        iaa.MedianPooling((1, 3)),
                     ]),
                     # search either for all edges or for directed edges,
                     iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05*255), per_channel=0.5), # add gaussian noise to images
-                    iaa.Add((-5, 5), per_channel=0.5),
+                    iaa.Add((-10, 10), per_channel=0.5),
+                    iaa.ChannelShuffle(0.1),
+                    iaa.JpegCompression(compression=(50, 90)),
+                    iaa.Grayscale(alpha=(0.0, 0.4)),
                 ],
                 random_order=True
             )

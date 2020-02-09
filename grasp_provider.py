@@ -1,4 +1,4 @@
-#!/usr/bin/env /home/test/grasp_models_pyvenv/bin/python
+#!/usr/bin/env /home/peter0749/anaconda3/envs/CGD/bin/python
 import sys
 if '/opt/ros/kinetic/lib/python2.7/dist-packages' in sys.path:
     sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
