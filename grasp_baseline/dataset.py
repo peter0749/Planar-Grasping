@@ -253,7 +253,7 @@ class CornellGraspDataset(Dataset):
             i = np.clip(i, 0, cfg.grid_size)
             j = np.clip(j, 0, cfg.grid_size)
             label[i,j,:5] = 1.0, offx, offy, w, h # Degration of YOLOv1/v2 (lack of anchor boxes)
-            label[i,j,5+angle_idx] = 1.0
+            label[i,j,5+angle_idx] += 1.0
         model_input[model_input!=model_input] = 0 # get rid of nans
         label[label!=label] = 0
         model_input = torch.from_numpy( np.transpose(model_input, (2,0,1)).astype(np.float32)  ) # (h,w,c) -> (c,h,w)

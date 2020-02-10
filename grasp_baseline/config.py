@@ -16,7 +16,7 @@ cornell_dataset_root = os.path.abspath(cornell_dataset_root)
 cornell_dataset_meta_root = os.path.abspath(cornell_dataset_meta_root)
 
 n_folds = 5 # 5 in paper
-max_sample_bbox = 9 # 5 in paper
+max_sample_bbox = 50 # 5 in paper
 max_pad_bbox = 50 # unknown in paper
 lambda_coord = 5   # Same as YOLOv1
 lambda_rot = 3

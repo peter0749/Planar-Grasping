@@ -22,13 +22,22 @@ def parse_args():
         '--batch_size', type=int, default=32, help='input batch size'
     )
     parser.add_argument(
-        '--nepoch', type=int, default=100, help='number of epochs to train for'
+        '--nepoch', type=int, default=200, help='number of epochs to train for'
     )
     parser.add_argument(
         '--lr', type=float, default=0.0005, help='Learning rate'
     )
     parser.add_argument(
         '--weight_decay', type=float, default=0.1, help='Weight decay'
+    )
+    parser.add_argument(
+        '--init_gamma', type=float, default=0.3, help=''
+    )
+    parser.add_argument(
+        '--final_gamma', type=float, default=0.3, help=''
+    )
+    parser.add_argument(
+        '--gamma_delta', type=float, default=0.99, help=''
     )
     parser.add_argument(
         '--batchnorm_momentum', type=float, default=0.2, help='Momentum of Batch Norm running means'
@@ -101,6 +110,7 @@ def main(args):
         best_model_top5 = -np.inf
         best_model_top1_easy = -np.inf
         best_model_top5_easy = -np.inf
+        cemd_gamma = args.init_gamma
         for e in range(args.nepoch):
             dataset.set_current_state('train')
             dataloader = setup_dataloader(dataset, args, mode='train')
@@ -120,7 +130,7 @@ def main(args):
                     target = target.cuda()
                 optimizer.zero_grad()
                 out = model(inp)
-                loss = grasp_loss(out, target)
+                loss = grasp_loss(out, target, gamma=cemd_gamma)
                 loss.backward()
                 optimizer.step()
                 loss_accum += loss.item() * len(inp)
@@ -158,7 +168,7 @@ def main(args):
                         inp = inp.cuda()
                         target = target.cuda()
                     out = model(inp)
-                    loss = grasp_loss(out, target)
+                    loss = grasp_loss(out, target, gamma=cemd_gamma)
                     loss_accum += loss.item() * len(inp)
                     bbox_pred, _, bbox_conf = feature2bboxwdeg(out.detach().cpu().numpy(), -np.inf)
                     bbox = bbox.numpy()
@@ -206,6 +216,8 @@ def main(args):
             logger.add_scalar('Fold-%d/val_top5-easy'%(fold_id+1), avg_val_top5_acc_easy, e+1)
             logger.add_scalar('Fold-%d/top5'%(fold_id+1), avg_train_top5_acc, e+1)
             logger.add_scalar('Fold-%d/val_top5'%(fold_id+1), avg_val_top5_acc, e+1)
+            logger.add_scalar('Fold-%d/gamma'%(fold_id+1), cemd_gamma, e+1)
+            cemd_gamma = max(cemd_gamma*args.gamma_delta, args.final_gamma)
             print("F: [%2d/%2d] E: [%2d/%2d] l: %.4f vl: %.4f top5: %.2f(%.2f) top1: %.2f(%.2f) top5_easy: %.2f(%.2f) top1_easy: %.2f(%.2f) eta: %s"%(fold_id+1, cfg.n_folds, e+1, args.nepoch, avg_train_loss, avg_val_loss, avg_val_top5_acc, best_model_top5, avg_val_top1_acc, best_top1_acc, avg_val_top5_acc_easy, best_model_top5_easy, avg_val_top1_acc_easy, best_model_top1_easy, str(eta)))
             sys.stdout.flush()
         del model, base_model

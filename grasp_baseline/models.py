@@ -105,7 +105,7 @@ class GraspModel(nn.Module):
         wh = torch.exp(self.wh_layer(x)) # YOLOv2
         #tha = self.cossine_layer(x)
         tha = self.angle_linear(x)
-        tha = torch.sigmoid(tha)
+        #tha = torch.sigmoid(tha)
         x = torch.cat((conf, xy, wh, tha), 1) # (b, c, h, w)
         return x
 
