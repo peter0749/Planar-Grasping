@@ -172,13 +172,11 @@ def paramize_bbox(x):
     offset_y = xy[1] - grid_idx_y # decimal
     h  = np.linalg.norm(x[0]-x[1]) # related to grid scale
     w  = np.linalg.norm(x[1]-x[2])
-    dx = x[1,0]-x[0,0]
-    dy = x[0,1]-x[1,1] # upside down
-    rad = np.arctan2(dy,dx) # [-pi, +pi]
-    if rad<0:
-        rad = rad+np.pi
-    rad_idx = min(int(rad/cfg.orientation_base), cfg.n_orientations-1)
-    return grid_idx_x, grid_idx_y, offset_x, offset_y, w, h, rad_idx
+    costha = (x[1,0]-x[0,0]) / (h+1e-8)  # (x[1].x - x[0].x) / norm(x[1]-x[0])
+    sintha = -(x[1,1]-x[0,1]) / (h+1e-8) # (x[1].y - x[0].y) / norm(x[1]-x[0]) coord in img is upside down
+    costha2 = 2*costha*costha-1  # Double-Angle formula
+    sintha2 = 2*costha*sintha
+    return grid_idx_x, grid_idx_y, offset_x, offset_y, w, h, costha2, sintha2
 
 ### Build in progress... ###
 class CornellGraspDataset(Dataset):
@@ -243,17 +241,16 @@ class CornellGraspDataset(Dataset):
         else:
             model_input = np.append(model_input, depth[...,np.newaxis], axis=-1)
         model_input = utils.preprocess_input(model_input)
-        label = np.zeros((cfg.grid_size,cfg.grid_size,5+cfg.n_orientations), dtype=np.float32) # (confidence,x,y,w,h,cos,sin)
+        label = np.zeros((cfg.grid_size,cfg.grid_size,7), dtype=np.float32) # (confidence,x,y,w,h,cos,sin)
         label[:,:,0] = -1.0 # negative
         for box in boxes:
             # grid_idx_x, grid_idx_y, offset_x, offset_y, w, h, costha2, sintha2
             box = box.clip(1e-6, 1-1e-6)
             box[box!=box] = 0
-            j, i, offx, offy, w, h, angle_idx = paramize_bbox(box)
+            j, i, offx, offy, w, h, costha2, sintha2 = paramize_bbox(box)
             i = np.clip(i, 0, cfg.grid_size)
             j = np.clip(j, 0, cfg.grid_size)
-            label[i,j,:5] = 1.0, offx, offy, w, h # Degration of YOLOv1/v2 (lack of anchor boxes)
-            label[i,j,5+angle_idx] += 1.0
+            label[i,j,:] = 1.0, offx, offy, w, h, costha2, sintha2 # Degration of YOLOv1/v2 (lack of anchor boxes)
         model_input[model_input!=model_input] = 0 # get rid of nans
         label[label!=label] = 0
         model_input = torch.from_numpy( np.transpose(model_input, (2,0,1)).astype(np.float32)  ) # (h,w,c) -> (c,h,w)

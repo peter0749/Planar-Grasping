@@ -50,7 +50,8 @@ def grasp_loss(inputs, target, gamma=0.3):
 
     #rot_loss = torch.abs((gt_cos_sin-input_cos_sin)*gt_mask).sum(-1).sum(-1).sum(-1) # shape: (b,)
     #rot_loss = (F.binary_cross_entropy(input_angle, gt_angle, reduction='none')*gt_mask).sum(-1).sum(-1).sum(-1)
-    rot_loss = (IEMD(gt_angle, input_angle, gamma=gamma)*gt_mask).sum(-1).sum(-1).sum(-1)
+    #rot_loss = (IEMD(gt_angle, input_angle, gamma=gamma)*gt_mask).sum(-1).sum(-1).sum(-1)
+    rot_loss = ((1.0-gt_angle*input_angle)*gt_mask).sum(-1).sum(-1).sum(-1)
 
     conf_loss = (m-input_heatmap*gt_heatmap).clamp(min=0) # hinge loss: max{0, 1-y_gt*y_hat}**2
     conf_loss = conf_loss.sum(-1).sum(-1).sum(-1) # shape: (b,)

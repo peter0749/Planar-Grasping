@@ -95,17 +95,18 @@ class GraspModel(nn.Module):
         self.conf_layer = nn.Conv2d(last_channel_n, 1, kernel_size=1, stride=1, padding=0, bias=True)
         self.xy_layer = nn.Conv2d(last_channel_n, 2, kernel_size=1, stride=1, padding=0, bias=True)
         self.wh_layer = nn.Conv2d(last_channel_n, 2, kernel_size=1, stride=1, padding=0, bias=True)
-        #self.cossine_layer = nn.Conv2d(self.last_channel_n[backbone], 2, kernel_size=1, stride=1, padding=0, bias=True)
-        self.angle_linear = nn.Conv2d(last_channel_n, cfg.n_orientations, kernel_size=1, stride=1, padding=0, bias=True)
+        self.cossine_layer = nn.Conv2d(last_channel_n, 2, kernel_size=1, stride=1, padding=0, bias=True)
+        #self.angle_linear = nn.Conv2d(last_channel_n, cfg.n_orientations, kernel_size=1, stride=1, padding=0, bias=True)
 
     def forward(self, x):
         x = self.feature_forward(self.backbone, x)
         conf = self.conf_layer(x)
         xy = torch.sigmoid(self.xy_layer(x))
         wh = torch.exp(self.wh_layer(x)) # YOLOv2
-        #tha = self.cossine_layer(x)
-        tha = self.angle_linear(x)
+        tha = self.cossine_layer(x)
+        #tha = self.angle_linear(x)
         #tha = torch.sigmoid(tha)
+        tha = tha / torch.norm(tha, p=2, dim=1, keepdim=True) # normalized rotation vector
         x = torch.cat((conf, xy, wh, tha), 1) # (b, c, h, w)
         return x
 
