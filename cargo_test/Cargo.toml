@@ -5,6 +5,6 @@ authors = ["Kuang-Yu Jeng <jengku@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-pyo3 = "0.7.0"
+pyo3 = "0.24.1"
 inline-python = "0.3.1"
 numpy = "0.6.0"
